@@ -1,0 +1,8 @@
+# Pins the Rust toolchain for CI, the release workflow and local builds (#428).
+# CI runs `clippy -D warnings`, so an unpinned `stable` can turn main red the
+# day a release changes lint defaults. Dependabot does not bump this file:
+# move the pin by hand, in its own PR, and fix whatever the new clippy flags.
+[toolchain]
+channel = "1.98.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

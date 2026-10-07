@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  # Deliberately unfiltered by base branch: a stacked PR targeting another
+  # feature branch needs the same signal as one targeting main.
+  pull_request:
+
+permissions:
+  contents: read
+
+# Cancel in-flight runs on the same PR/branch when a new push lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/checks.yml

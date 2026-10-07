@@ -1,0 +1,837 @@
+{
+  "id": "p2p",
+  "name": "Procure-to-Pay",
+  "description": "A four-phase Procure-to-Pay process: a business unit raises a requisition, finance validates the budget, procurement selects a vendor and raises a purchase order, and accounts payable matches and settles the invoice. Seeded with five known gaps so the Gaps register has something to work on straight away.",
+  "version": 1,
+  "sipoc": {
+    "suppliers": [
+      "Business Unit",
+      "Vendor Billing",
+      "Cost Centre Owner"
+    ],
+    "inputs": [
+      "Purchase need",
+      "Vendor catalogue",
+      "Budget allocation"
+    ],
+    "process": "A business unit raises a purchase requisition, the budget owner validates funding, procurement reviews the requisition and selects a vendor, a manager approves the spend, procurement issues a purchase order, the vendor delivers, and accounts payable matches the invoice against the order and the receipt before paying on NET-30 terms.",
+    "outputs": [
+      "Issued purchase order",
+      "Goods receipt note",
+      "Payment remittance"
+    ],
+    "customers": [
+      "Vendor",
+      "Business Unit",
+      "Payments Team"
+    ]
+  },
+  "teams": [
+    {
+      "key": "requestor",
+      "name": "Requestor",
+      "color": "#3B82F6",
+      "description": "The business unit that raises the requisition and confirms delivery",
+      "order": 1,
+      "tags": []
+    },
+    {
+      "key": "procurement",
+      "name": "Procurement",
+      "color": "#10B981",
+      "description": "Sources vendors, negotiates terms, and raises purchase orders",
+      "order": 2,
+      "tags": []
+    },
+    {
+      "key": "budget-owner",
+      "name": "Budget Owner",
+      "color": "#F59E0B",
+      "description": "Owns the cost centre and approves the spend",
+      "order": 3,
+      "tags": []
+    },
+    {
+      "key": "it-integrations",
+      "name": "IT/Integrations",
+      "color": "#8B5CF6",
+      "description": "Automated routing and the ERP integrations the process depends on",
+      "order": 4,
+      "tags": []
+    },
+    {
+      "key": "vendor",
+      "name": "Vendor",
+      "color": "#6B7280",
+      "description": "The external supplier of the goods or services",
+      "order": 5,
+      "tags": []
+    },
+    {
+      "key": "accounts-payable",
+      "name": "Accounts Payable",
+      "color": "#14B8A6",
+      "description": "Matches invoices to orders and receipts, and settles them",
+      "order": 6,
+      "tags": []
+    }
+  ],
+  "systems": [
+    {
+      "key": "erp",
+      "name": "ERP",
+      "description": "System of record for budgets, purchase orders, and goods receipts",
+      "type": "ERP",
+      "tags": []
+    },
+    {
+      "key": "procurement-portal",
+      "name": "Procurement Portal",
+      "description": "Where requisitions are raised, routed, and approved",
+      "type": "Custom",
+      "tags": []
+    },
+    {
+      "key": "ap-automation",
+      "name": "AP Automation",
+      "description": "Captures vendor invoices and runs the three-way match",
+      "type": "Custom",
+      "tags": []
+    },
+    {
+      "key": "banking-portal",
+      "name": "Banking Portal",
+      "description": "Releases the payment run to the bank",
+      "type": "Other",
+      "tags": []
+    },
+    {
+      "key": "email",
+      "name": "Email",
+      "description": "Out-of-system notifications and vendor correspondence",
+      "type": "Other",
+      "tags": []
+    }
+  ],
+  "milestones": [
+    {
+      "key": "requisition",
+      "name": "Requisition",
+      "order": 0,
+      "description": "The need is written down and funded before anyone talks to a vendor",
+      "relatedPolicyKeys": []
+    },
+    {
+      "key": "approval",
+      "name": "Approval",
+      "order": 1,
+      "description": "Procurement reviews the requisition, picks a vendor, and the spend is approved",
+      "relatedPolicyKeys": [
+        "approval-threshold",
+        "approved-vendor-list"
+      ]
+    },
+    {
+      "key": "purchase-order",
+      "name": "Purchase Order",
+      "order": 2,
+      "description": "The commitment is raised, posted to the ERP, and delivered against",
+      "relatedPolicyKeys": []
+    },
+    {
+      "key": "payment",
+      "name": "Payment",
+      "order": 3,
+      "description": "Receipt, invoice, and order are matched before money moves",
+      "relatedPolicyKeys": [
+        "net-30-terms"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "key": "create-purchase-requisition",
+      "label": "Create Purchase Requisition",
+      "teamKey": "requestor",
+      "milestoneKey": "requisition",
+      "order": 1,
+      "suppliers": [
+        "Business Unit"
+      ],
+      "inputs": [
+        "Purchase need"
+      ],
+      "outputs": [
+        "Draft purchase requisition"
+      ],
+      "customers": [
+        "Requisition Owner"
+      ],
+      "systems": [
+        "Procurement Portal"
+      ],
+      "trigger": "A team identifies a need that existing stock or contracts cannot meet",
+      "result": "A draft requisition with line items, quantities, and a cost centre",
+      "kpi": "Requisitions accepted without rework on first submission"
+    },
+    {
+      "key": "submit-for-budget-check",
+      "label": "Submit for Budget Check",
+      "teamKey": "requestor",
+      "milestoneKey": "requisition",
+      "order": 2,
+      "suppliers": [
+        "Requisition Owner"
+      ],
+      "inputs": [
+        "Draft purchase requisition"
+      ],
+      "outputs": [
+        "Submitted purchase requisition"
+      ],
+      "customers": [
+        "Cost Centre Owner"
+      ],
+      "systems": [
+        "Procurement Portal",
+        "Email"
+      ],
+      "trigger": "The requestor marks the draft complete",
+      "result": "The requisition leaves the requestor's queue and lands with the budget owner",
+      "kpi": "Time from draft created to submitted"
+    },
+    {
+      "key": "validate-budget",
+      "label": "Validate Budget",
+      "teamKey": "budget-owner",
+      "milestoneKey": "requisition",
+      "order": 3,
+      "suppliers": [
+        "Requisition Owner"
+      ],
+      "inputs": [
+        "Submitted purchase requisition"
+      ],
+      "outputs": [
+        "Budget validation result"
+      ],
+      "customers": [
+        "Cost Centre Owner"
+      ],
+      "systems": [
+        "ERP"
+      ],
+      "trigger": "A submitted requisition arrives in the budget owner's queue",
+      "result": "The requested amount is checked against the remaining cost-centre allocation",
+      "kpi": "Requisitions validated within one working day",
+      "notes": "Checked by hand against the ERP today — see the budget validation gap."
+    },
+    {
+      "key": "confirm-budget-availability",
+      "label": "Confirm Budget Availability",
+      "teamKey": "budget-owner",
+      "milestoneKey": "requisition",
+      "order": 4,
+      "suppliers": [
+        "Cost Centre Owner"
+      ],
+      "inputs": [
+        "Budget validation result"
+      ],
+      "outputs": [
+        "Budget-approved requisition"
+      ],
+      "customers": [
+        "Procurement Intake"
+      ],
+      "systems": [
+        "ERP",
+        "Procurement Portal"
+      ],
+      "trigger": "The budget check returns a result",
+      "result": "Funds are earmarked against the cost centre and the requisition is released to procurement",
+      "kpi": "Share of requisitions funded without a budget transfer"
+    },
+    {
+      "key": "route-to-procurement",
+      "label": "Route to Procurement",
+      "teamKey": "it-integrations",
+      "milestoneKey": "approval",
+      "order": 1,
+      "suppliers": [
+        "Cost Centre Owner"
+      ],
+      "inputs": [
+        "Budget-approved requisition"
+      ],
+      "outputs": [
+        "Routed requisition"
+      ],
+      "customers": [
+        "Category Buyer"
+      ],
+      "systems": [
+        "Procurement Portal"
+      ],
+      "trigger": "A requisition is marked budget-approved",
+      "result": "The portal assigns the requisition to a procurement category buyer",
+      "kpi": "Requisitions routed to the correct buyer first time",
+      "notes": "Automated routing rule in the Procurement Portal, not a person."
+    },
+    {
+      "key": "review-purchase-requisition",
+      "label": "Review Purchase Requisition",
+      "teamKey": "procurement",
+      "milestoneKey": "approval",
+      "order": 2,
+      "suppliers": [
+        "Procurement Intake"
+      ],
+      "inputs": [
+        "Routed requisition"
+      ],
+      "outputs": [
+        "Reviewed requisition"
+      ],
+      "customers": [
+        "Category Buyer"
+      ],
+      "systems": [
+        "Procurement Portal"
+      ],
+      "trigger": "A requisition lands in the buyer's queue",
+      "result": "Specification, quantity, and category are confirmed or sent back for detail",
+      "kpi": "Requisitions returned to the requestor for clarification"
+    },
+    {
+      "key": "select-vendor",
+      "label": "Select Vendor",
+      "teamKey": "procurement",
+      "milestoneKey": "approval",
+      "order": 3,
+      "suppliers": [
+        "Category Buyer"
+      ],
+      "inputs": [
+        "Reviewed requisition"
+      ],
+      "outputs": [
+        "Selected vendor"
+      ],
+      "customers": [
+        "Category Buyer"
+      ],
+      "systems": [
+        "Procurement Portal",
+        "ERP"
+      ],
+      "trigger": "A reviewed requisition needs a source of supply",
+      "result": "A vendor is chosen from the approved list, or a new vendor is proposed",
+      "kpi": "Spend placed with approved vendors"
+    },
+    {
+      "key": "negotiate-terms",
+      "label": "Negotiate Terms",
+      "teamKey": "procurement",
+      "milestoneKey": "approval",
+      "order": 4,
+      "suppliers": [
+        "Category Buyer"
+      ],
+      "inputs": [
+        "Selected vendor"
+      ],
+      "outputs": [
+        "Negotiated terms"
+      ],
+      "customers": [
+        "Approving Manager"
+      ],
+      "systems": [
+        "Email"
+      ],
+      "trigger": "A vendor is selected",
+      "result": "Price, delivery date, and payment terms are agreed with the vendor",
+      "kpi": "Savings against the requisition's estimated value"
+    },
+    {
+      "key": "manager-approval",
+      "label": "Manager Approval",
+      "teamKey": "budget-owner",
+      "milestoneKey": "approval",
+      "order": 5,
+      "suppliers": [
+        "Category Buyer"
+      ],
+      "inputs": [
+        "Negotiated terms"
+      ],
+      "outputs": [
+        "Approval decision"
+      ],
+      "customers": [
+        "Approving Manager"
+      ],
+      "systems": [
+        "Procurement Portal"
+      ],
+      "decision": true,
+      "branches": [
+        {
+          "when": "Approved",
+          "toStepKey": "release-approved-requisition",
+          "label": "Approved"
+        },
+        {
+          "when": "Rejected",
+          "toStepKey": "create-purchase-requisition",
+          "label": "Rejected — rework"
+        }
+      ],
+      "trigger": "Negotiated terms are submitted for sign-off",
+      "result": "Approved requisitions are released to procurement to raise the order; rejected ones return to the requestor for rework",
+      "kpi": "Approval turnaround from submission to decision"
+    },
+    {
+      "key": "release-approved-requisition",
+      "label": "Release Approved Requisition",
+      "teamKey": "budget-owner",
+      "milestoneKey": "approval",
+      "order": 6,
+      "suppliers": [
+        "Approving Manager"
+      ],
+      "inputs": [
+        "Approval decision"
+      ],
+      "outputs": [
+        "Approved requisition"
+      ],
+      "customers": [
+        "Order Desk"
+      ],
+      "systems": [
+        "Procurement Portal"
+      ],
+      "trigger": "A manager records an approval decision",
+      "result": "The approved requisition is released to procurement to raise the order",
+      "kpi": "Approved requisitions released the same day"
+    },
+    {
+      "key": "create-purchase-order",
+      "label": "Create Purchase Order",
+      "teamKey": "procurement",
+      "milestoneKey": "purchase-order",
+      "order": 1,
+      "suppliers": [
+        "Approving Manager"
+      ],
+      "inputs": [
+        "Approved requisition"
+      ],
+      "outputs": [
+        "Purchase order"
+      ],
+      "customers": [
+        "ERP Integration"
+      ],
+      "systems": [
+        "Procurement Portal",
+        "ERP"
+      ],
+      "trigger": "An approved requisition is released to procurement",
+      "result": "A purchase order is raised against the approved vendor and terms",
+      "kpi": "Purchase orders raised without amendment"
+    },
+    {
+      "key": "sync-purchase-order-to-accounting",
+      "label": "Sync Purchase Order to Accounting System",
+      "teamKey": "it-integrations",
+      "milestoneKey": "purchase-order",
+      "order": 2,
+      "suppliers": [
+        "Order Desk"
+      ],
+      "inputs": [
+        "Purchase order"
+      ],
+      "outputs": [
+        "Purchase order posted to ERP"
+      ],
+      "customers": [
+        "Order Desk"
+      ],
+      "systems": [
+        "ERP"
+      ],
+      "trigger": "A purchase order is raised in the portal",
+      "result": "The commitment is posted against the cost centre in the ERP",
+      "kpi": "Purchase orders posted to the ERP within the hour",
+      "notes": "The nightly job that carries this is the source of the accounting sync gap."
+    },
+    {
+      "key": "issue-purchase-order-to-vendor",
+      "label": "Issue Purchase Order to Vendor",
+      "teamKey": "procurement",
+      "milestoneKey": "purchase-order",
+      "order": 3,
+      "suppliers": [
+        "ERP Integration"
+      ],
+      "inputs": [
+        "Purchase order posted to ERP"
+      ],
+      "outputs": [
+        "Issued purchase order"
+      ],
+      "customers": [
+        "Supplier Account Manager"
+      ],
+      "systems": [
+        "Email",
+        "Procurement Portal"
+      ],
+      "trigger": "The purchase order is posted to the ERP",
+      "result": "The vendor receives the order and the agreed terms in writing",
+      "kpi": "Orders issued within one day of approval"
+    },
+    {
+      "key": "acknowledge-purchase-order",
+      "label": "Acknowledge Purchase Order",
+      "teamKey": "vendor",
+      "milestoneKey": "purchase-order",
+      "order": 4,
+      "suppliers": [
+        "Order Desk"
+      ],
+      "inputs": [
+        "Issued purchase order"
+      ],
+      "outputs": [
+        "Order acknowledgement"
+      ],
+      "customers": [
+        "Supplier Account Manager"
+      ],
+      "systems": [
+        "Email"
+      ],
+      "trigger": "The vendor receives a purchase order",
+      "result": "The vendor confirms price, quantity, and a delivery date",
+      "kpi": "Orders acknowledged within two working days"
+    },
+    {
+      "key": "deliver-goods-or-services",
+      "label": "Deliver Goods or Services",
+      "teamKey": "vendor",
+      "milestoneKey": "purchase-order",
+      "order": 5,
+      "suppliers": [
+        "Supplier Account Manager"
+      ],
+      "inputs": [
+        "Order acknowledgement"
+      ],
+      "outputs": [
+        "Delivered goods or services",
+        "Delivery note"
+      ],
+      "customers": [
+        "Goods Receiver"
+      ],
+      "systems": [
+        "Email"
+      ],
+      "trigger": "The vendor acknowledges the order",
+      "result": "Goods or services arrive at the requesting business unit with a delivery note",
+      "kpi": "Deliveries on or before the acknowledged date"
+    },
+    {
+      "key": "record-goods-receipt",
+      "label": "Record Goods Receipt",
+      "teamKey": "requestor",
+      "milestoneKey": "payment",
+      "order": 1,
+      "suppliers": [
+        "Supplier Account Manager"
+      ],
+      "inputs": [
+        "Delivered goods or services",
+        "Delivery note"
+      ],
+      "outputs": [
+        "Goods receipt note"
+      ],
+      "customers": [
+        "Accounts Payable Clerk"
+      ],
+      "systems": [
+        "ERP"
+      ],
+      "trigger": "Goods or services arrive at the business unit",
+      "result": "Receipt is recorded against the purchase order line, quantity by quantity",
+      "kpi": "Receipts recorded within two days of delivery"
+    },
+    {
+      "key": "receive-vendor-invoice",
+      "label": "Receive Vendor Invoice",
+      "teamKey": "accounts-payable",
+      "milestoneKey": "payment",
+      "order": 2,
+      "suppliers": [
+        "Vendor Billing",
+        "Goods Receiver"
+      ],
+      "inputs": [
+        "Vendor invoice",
+        "Goods receipt note"
+      ],
+      "outputs": [
+        "Registered invoice"
+      ],
+      "customers": [
+        "Accounts Payable Clerk"
+      ],
+      "systems": [
+        "AP Automation"
+      ],
+      "trigger": "A vendor invoice arrives against an open purchase order",
+      "result": "The invoice is captured and registered against the order",
+      "kpi": "Invoices captured without manual keying"
+    },
+    {
+      "key": "perform-three-way-match",
+      "label": "Perform Three-Way Match",
+      "teamKey": "accounts-payable",
+      "milestoneKey": "payment",
+      "order": 3,
+      "suppliers": [
+        "Accounts Payable Clerk"
+      ],
+      "inputs": [
+        "Registered invoice"
+      ],
+      "outputs": [
+        "Matched invoice"
+      ],
+      "customers": [
+        "Payments Team"
+      ],
+      "systems": [
+        "AP Automation",
+        "ERP"
+      ],
+      "trigger": "An invoice is registered against a purchase order",
+      "result": "Order, receipt, and invoice are compared; exceptions are held for query",
+      "kpi": "Invoices matching on first pass"
+    },
+    {
+      "key": "schedule-payment",
+      "label": "Schedule Payment on NET-30 Terms",
+      "teamKey": "accounts-payable",
+      "milestoneKey": "payment",
+      "order": 4,
+      "suppliers": [
+        "Accounts Payable Clerk"
+      ],
+      "inputs": [
+        "Matched invoice"
+      ],
+      "outputs": [
+        "Scheduled payment"
+      ],
+      "customers": [
+        "Payments Team"
+      ],
+      "systems": [
+        "AP Automation"
+      ],
+      "trigger": "An invoice clears the three-way match",
+      "result": "The invoice joins a payment run dated to the agreed terms",
+      "kpi": "Invoices paid on terms rather than early or late"
+    },
+    {
+      "key": "execute-payment-and-close-purchase-order",
+      "label": "Execute Payment and Close Purchase Order",
+      "teamKey": "accounts-payable",
+      "milestoneKey": "payment",
+      "order": 5,
+      "suppliers": [
+        "Payments Team"
+      ],
+      "inputs": [
+        "Scheduled payment"
+      ],
+      "outputs": [
+        "Payment remittance",
+        "Closed purchase order"
+      ],
+      "customers": [
+        "Vendor",
+        "Business Unit"
+      ],
+      "systems": [
+        "Banking Portal",
+        "ERP"
+      ],
+      "trigger": "A payment run reaches its scheduled date",
+      "result": "The vendor is paid, remittance is sent, and the purchase order is closed",
+      "kpi": "Purchase orders closed within a week of final payment"
+    }
+  ],
+  "policies": [
+    {
+      "key": "approval-threshold",
+      "title": "Purchases over $5,000 require manager approval",
+      "content": "Any requisition with a total value above $5,000 must be approved by the cost-centre owner before a purchase order is raised. Requisitions at or below the threshold are approved by the category buyer.",
+      "relatedMilestoneKeys": [
+        "approval"
+      ],
+      "testNotes": "Raise a requisition for $5,001 and confirm it cannot reach Purchase Order without a recorded manager decision.",
+      "tags": [
+        "approval",
+        "threshold"
+      ]
+    },
+    {
+      "key": "approved-vendor-list",
+      "title": "Vendors must be on the approved vendor list",
+      "content": "Procurement may only place an order with a vendor that has completed onboarding and appears on the approved vendor list. A new vendor must be onboarded before the order is raised, not after.",
+      "relatedMilestoneKeys": [
+        "approval"
+      ],
+      "testNotes": "Attempt to select a vendor that is not on the list and confirm the requisition is held.",
+      "tags": [
+        "vendor",
+        "compliance"
+      ]
+    },
+    {
+      "key": "net-30-terms",
+      "title": "Payment terms default to NET-30",
+      "content": "Unless a contract states otherwise, vendor invoices are scheduled for payment thirty days from invoice date. Shorter terms require the budget owner's agreement at negotiation, not at payment.",
+      "relatedMilestoneKeys": [
+        "payment"
+      ],
+      "testNotes": "Check that a matched invoice with no contract override schedules thirty days out.",
+      "tags": [
+        "payment",
+        "terms"
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "key": "vendor-onboarding-missing",
+      "stepKey": "select-vendor",
+      "observed": "A buyer can select a vendor that has never been onboarded. Onboarding is chased by email after the order is placed, and bank details are collected at invoice time.",
+      "expected": "A documented vendor onboarding process gates selection: no vendor reaches the approved list without verified bank details, tax status, and a signed agreement.",
+      "severity": "H",
+      "rootCause": "Policy",
+      "ownerTeamKey": "procurement",
+      "fixIdea": "Write the onboarding standard, then make the approved vendor list the only selectable source in the portal.",
+      "timeToFix": "mid",
+      "status": "Open"
+    },
+    {
+      "key": "manual-budget-validation",
+      "stepKey": "validate-budget",
+      "observed": "The budget owner opens the ERP and compares the requisition total against the remaining allocation by hand. Nothing stops a requisition that exceeds it.",
+      "expected": "The portal checks the requisition against the live cost-centre balance and flags an overspend before it reaches procurement.",
+      "severity": "M",
+      "rootCause": "Config",
+      "ownerTeamKey": "it-integrations",
+      "fixIdea": "Call the ERP budget endpoint from the portal's submit action and block on a hard overspend.",
+      "timeToFix": "near",
+      "status": "Open"
+    },
+    {
+      "key": "approval-routing-unclear",
+      "stepKey": "route-to-procurement",
+      "observed": "The routing rule assigns by spend category, but the category list has not been reviewed in two years. Buyers reassign roughly a fifth of requisitions by hand.",
+      "expected": "Routing rules are documented, owned, and reviewed, so a requisition reaches the right buyer without reassignment.",
+      "severity": "L",
+      "rootCause": "Behavior",
+      "ownerTeamKey": "it-integrations",
+      "fixIdea": "Publish the routing matrix, give it an owner, and review it quarterly against reassignment counts.",
+      "timeToFix": "qwin",
+      "status": "Open"
+    },
+    {
+      "key": "po-accounting-sync-fails",
+      "stepKey": "sync-purchase-order-to-accounting",
+      "observed": "The portal-to-ERP sync runs nightly and fails silently on orders with more than twenty lines. Finance finds the missing commitments at month end.",
+      "expected": "Every purchase order posts to the ERP within the hour, and a failed post raises an alert rather than passing quietly.",
+      "severity": "H",
+      "rootCause": "Data",
+      "ownerTeamKey": "it-integrations",
+      "fixIdea": "Batch long orders, and fail the job loudly with a retry queue instead of swallowing the error.",
+      "timeToFix": "near",
+      "status": "Open"
+    },
+    {
+      "key": "rejected-pr-no-audit-trail",
+      "stepKey": "manager-approval",
+      "observed": "A rejected requisition returns to the requestor with no record of who rejected it, when, or why. The reason lives in whatever email followed.",
+      "expected": "Every approval decision, rejection included, is stamped with approver, timestamp, and reason, and is readable from the requisition.",
+      "severity": "M",
+      "rootCause": "Config",
+      "ownerTeamKey": "budget-owner",
+      "fixIdea": "Make the rejection reason a required field and write the decision to the requisition's history.",
+      "timeToFix": "qwin",
+      "status": "Open"
+    }
+  ],
+  "glossary": [
+    {
+      "key": "purchase-requisition",
+      "term": "Purchase Requisition",
+      "definition": "An internal request to buy something. It is not a commitment to a vendor — that is the purchase order.",
+      "acronym": "PR",
+      "relatedStepKeys": [
+        "create-purchase-requisition",
+        "submit-for-budget-check"
+      ],
+      "tags": []
+    },
+    {
+      "key": "purchase-order",
+      "term": "Purchase Order",
+      "definition": "The document that commits the organisation to buy from a named vendor at agreed terms. Legally binding once acknowledged.",
+      "acronym": "PO",
+      "relatedStepKeys": [
+        "create-purchase-order",
+        "issue-purchase-order-to-vendor"
+      ],
+      "tags": []
+    },
+    {
+      "key": "goods-receipt-note",
+      "term": "Goods Receipt Note",
+      "definition": "The record that what was ordered actually arrived, line by line. One of the three documents in the three-way match.",
+      "acronym": "GRN",
+      "relatedStepKeys": [
+        "record-goods-receipt"
+      ],
+      "tags": []
+    },
+    {
+      "key": "three-way-match",
+      "term": "Three-Way Match",
+      "definition": "Comparing the purchase order, the goods receipt, and the vendor invoice before paying. A mismatch on any pair holds the invoice.",
+      "relatedStepKeys": [
+        "perform-three-way-match"
+      ],
+      "tags": []
+    },
+    {
+      "key": "net-30",
+      "term": "NET-30",
+      "definition": "Payment terms meaning the invoice is due thirty days from its date.",
+      "relatedStepKeys": [
+        "schedule-payment"
+      ],
+      "tags": []
+    }
+  ]
+}

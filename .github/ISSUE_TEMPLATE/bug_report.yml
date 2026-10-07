@@ -1,0 +1,45 @@
+name: Report a bug
+description: Something in GapScout did not work the way you expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing GapScout. This issue is **public**, so please leave out anything confidential about the processes you map.
+
+        The quickest way to fill in the details below is **Help → About → Copy diagnostics** in the app (`⌘/` or `Ctrl+/`).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, and what did GapScout do?
+      placeholder: I chose Place before on a new gap and the form stayed on Saving…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If you can make it happen again, how?
+      placeholder: |
+        1. Open a project
+        2. …
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste from Help → About → Copy diagnostics.
+      placeholder: "## GapScout diagnostics …"
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots help. Drag them in here.

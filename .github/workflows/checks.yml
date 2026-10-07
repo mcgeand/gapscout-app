@@ -1,0 +1,193 @@
+name: Checks
+
+# Single source of truth for the project's quality gates. Called by ci.yml on
+# pushes and PRs, and callable by any other workflow (e.g. a Dependabot
+# lockfile repairer) so check logic never has to be duplicated or kept in sync.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Ref to check out. Defaults to the ref that triggered the caller.
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: gapscout
+
+jobs:
+  lockfile:
+    name: Lockfile integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: gapscout/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # Regenerating the lockfile must be a no-op. Dependabot's pnpm support
+      # drops the `overrides:` block (our CVE pins), which only surfaces later
+      # as an opaque ERR_PNPM_LOCKFILE_CONFIG_MISMATCH — and would break main
+      # if merged. This turns any drift into a named failure with a fix hint.
+      - name: Assert lockfile is in sync with package.json
+        run: |
+          cp pnpm-lock.yaml /tmp/pnpm-lock.expected
+          pnpm install --lockfile-only --ignore-scripts
+          if ! diff -q /tmp/pnpm-lock.expected pnpm-lock.yaml >/dev/null; then
+            echo "::error file=gapscout/pnpm-lock.yaml::pnpm-lock.yaml is out of sync with package.json. Run 'pnpm install --lockfile-only' in gapscout/ and commit the result."
+            echo "--- Drift (expected vs regenerated), first 60 lines ---"
+            diff -u /tmp/pnpm-lock.expected pnpm-lock.yaml | head -60
+            exit 1
+          fi
+          echo "Lockfile is in sync."
+
+  rust:
+    name: Rust check and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gapscout/src-tauri
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Tauri 2 links against webkit2gtk and friends; even `cargo check` needs
+      # them present for the crates' build scripts to resolve via pkg-config.
+      - name: Install Tauri system dependencies
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            patchelf
+
+      # The version and components come from src-tauri/rust-toolchain.toml, so
+      # clippy's lint set only changes when that pin moves (#428).
+      - name: Set up Rust
+        run: rustup toolchain install
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: gapscout/src-tauri
+
+      # Without this job a Dependabot cargo bump for src-tauri passes CI having
+      # never compiled Rust.
+      - name: Cargo fmt check
+        run: cargo fmt --check
+
+      - name: Cargo check
+        run: cargo check --all-targets --locked
+
+      - name: Cargo clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Cargo test
+        run: cargo test --locked
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: gapscout/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # Catches a transitive dep resolving to a vulnerable version. To triage an
+      # advisory with no fix available, add it to `pnpm.auditConfig.ignoreGhsas`
+      # in package.json with a dated comment rather than disabling this job.
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+
+  build:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: gapscout/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: gapscout/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # The probe is the point: `pnpm typecheck` must be a command that can
+      # actually fail. The root tsconfig is solution-style (`files: []` plus
+      # references), and plain `tsc` does not follow project references — so
+      # `tsc --noEmit` silently checks nothing and exits 0. Asserting against a
+      # known-bad file in the same step keeps the assertion and the real run on
+      # one command string, so the gate cannot go quietly dead again. See #234.
+      - name: Type check
+        run: |
+          set -e
+          probe=src/__typecheck_probe__.ts
+          trap 'rm -f "$probe"' EXIT
+          printf 'export const broken: number = "not a number"\n' > "$probe"
+          if pnpm typecheck; then
+            echo "::error file=gapscout/package.json::pnpm typecheck passed a deliberate type error, so the Type check gate is a no-op. It must run 'tsc -b' — plain 'tsc' does not follow project references. See #234."
+            exit 1
+          fi
+          rm -f "$probe"
+          pnpm typecheck
+
+      - name: Test
+        run: pnpm test:run
+
+      # The native Tauri build (`pnpm tauri:build`) is intentionally NOT run
+      # here — it needs a Rust toolchain and platform-specific system libs.
+      - name: Build (web bundle)
+        run: pnpm build

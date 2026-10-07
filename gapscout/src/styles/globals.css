@@ -1,0 +1,1018 @@
+/* GapScout - Global Styles
+ *
+ * Token architecture (decision for #200):
+ *   - The design tokens live ONCE, in plain `:root`, under the design's own
+ *     names (--gs-accent, --gs-ink, ...). They are semantic roles, so the dark
+ *     palette (#193) is a value swap on :root, not a component rewrite.
+ *   - `@theme inline` below maps Tailwind's namespaces onto those variables.
+ *     That is what turns them into utilities (bg-gs-accent, text-gs-ink,
+ *     p-gs-4, font-sans) without creating a second source of truth: `inline`
+ *     makes each utility reference var(--gs-*) directly, so a :root override
+ *     still propagates.
+ *   - Component classes sit in `@layer components`, so Tailwind utilities on
+ *     the same element win. Before #200 they were unlayered and silently beat
+ *     every utility.
+ */
+
+@import "tailwindcss";
+
+/* Archivo is self-hosted via @fontsource and imported in main.tsx, so the
+   built app never makes a runtime font request. */
+
+/* ------------------------------------------------------------------ */
+/* Tokens                                                              */
+/* ------------------------------------------------------------------ */
+
+:root {
+  /* Light-only for now: `light dark` made WebKit paint native controls
+     (checkboxes, selects, scrollbars) dark on a Mac in dark mode while the
+     app itself is painted light. Dark mode is #193. */
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* ground + ink — replaces bg-gray-50 / #F9FAFB */
+  --gs-bg:        #f3f2f2;
+  --gs-surface:   #ffffff;
+  --gs-sunken:    #f8f4f4;
+  --gs-ink:       #201e1d;   /* was Deep Navy #1E3A8A */
+  --gs-ink-muted: #605d5d;
+  --gs-ink-faint: #9b9797;
+
+  /* one accent — primary action, active tab, high severity */
+  --gs-accent:       #ec3013;   /* was Scout Orange #F59E0B */
+  --gs-accent-tint:  #fff2ef;
+  --gs-accent-ink:   #ae1800;   /* accent at paragraph size */
+  --gs-accent-press: #dd2b0f;
+
+  /* identity only — the mark, the installer, the website.
+     Never a control, never a status. */
+  --gs-brand:     #F59E0B;   /* Scout Orange */
+
+  /* rules — 2px structural, 1px row */
+  --gs-rule-strong: #201e1d;
+  --gs-rule:        #d7d3d3;
+  --gs-rule-faint:  #eae7e7;
+
+  /* text on an accent or ink ground */
+  --gs-on-accent: #ffffff;
+  --gs-on-ink:    #bab6b6;
+
+  /* type */
+  --gs-font: "Archivo", system-ui, sans-serif;
+  --gs-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* spacing — the ONLY six values */
+  --gs-1: 4px;  --gs-2: 8px;  --gs-3: 12px;
+  --gs-4: 16px; --gs-6: 24px; --gs-8: 32px;
+
+  --gs-radius: 0px;
+
+  /* stacking — three named steps, so no component picks a number (#204).
+     `popover` is the level the diagram's context menu and the multi-select
+     dropdown already sit at via inline zIndex; it is named here so the two
+     modal steps can be placed either side of it deliberately. A dropdown
+     opened inside a dialog has to paint over that dialog, and a dialog
+     opened from inside a dialog has to paint over the dropdown. */
+  --gs-z-modal:        100;
+  --gs-z-popover:     1000;
+  --gs-z-modal-above: 2000;
+
+  /* Legacy brand variables, kept as aliases while the remaining TSX call sites
+     still read them. #202 retired the constants.ts colour maps but deliberately
+     left these inline-style sites alone: they live in the files #203-#208
+     rewrite. Delete these aliases with the last of those call sites.
+     scout-orange resolves to the accent, not the brand, so the app carries
+     one accent during the transition (#208 gives the mark --gs-brand). */
+  --color-scout-orange: var(--gs-accent);
+  --color-deep-navy:    var(--gs-ink);
+  --color-neutral-gray: var(--gs-ink-muted);
+}
+
+/* Tailwind namespace bridge. Only tokens that need a utility are mapped;
+   legacy --color-* aliases are deliberately NOT here, or they would sprout
+   bg-scout-orange utilities. */
+@theme inline {
+  --font-sans: var(--gs-font);
+  --font-mono: var(--gs-mono);
+
+  --color-gs-bg:           var(--gs-bg);
+  --color-gs-surface:      var(--gs-surface);
+  --color-gs-sunken:       var(--gs-sunken);
+  --color-gs-ink:          var(--gs-ink);
+  --color-gs-ink-muted:    var(--gs-ink-muted);
+  --color-gs-ink-faint:    var(--gs-ink-faint);
+  --color-gs-accent:       var(--gs-accent);
+  --color-gs-accent-tint:  var(--gs-accent-tint);
+  --color-gs-accent-ink:   var(--gs-accent-ink);
+  --color-gs-accent-press: var(--gs-accent-press);
+  --color-gs-brand:        var(--gs-brand);
+  --color-gs-on-accent:    var(--gs-on-accent);
+  --color-gs-on-ink:       var(--gs-on-ink);
+  --color-gs-rule-strong:  var(--gs-rule-strong);
+  --color-gs-rule:         var(--gs-rule);
+  --color-gs-rule-faint:   var(--gs-rule-faint);
+
+  --spacing-gs-1: var(--gs-1);
+  --spacing-gs-2: var(--gs-2);
+  --spacing-gs-3: var(--gs-3);
+  --spacing-gs-4: var(--gs-4);
+  --spacing-gs-6: var(--gs-6);
+  --spacing-gs-8: var(--gs-8);
+
+  --radius-gs: var(--gs-radius);
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Tailwind v4 Preflight leaves buttons on the default cursor. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* One focus ring everywhere — never the browser default. */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--gs-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Components                                                          */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+  /* buttons — 2px border, zero radius, flush-left label.
+     The base is folded into every variant so `className="btn-primary"`
+     keeps working at all 86 call sites. */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    font: 600 13px var(--gs-font);
+    padding: 9px 16px;
+    border: 2px solid transparent;
+    border-radius: var(--gs-radius);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 150ms, border-color 150ms;
+  }
+  .btn-primary {
+    background: var(--gs-accent);
+    color: var(--gs-on-accent);
+    border-color: var(--gs-accent);
+  }
+  .btn-primary:hover {
+    background: var(--gs-accent-press);
+    border-color: var(--gs-accent-press);
+  }
+  .btn-secondary {
+    background: var(--gs-surface);
+    color: var(--gs-ink);
+    border-color: var(--gs-ink);
+  }
+  .btn-secondary:hover {
+    background: var(--gs-sunken);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--gs-ink-muted);
+  }
+  .btn-ghost:hover {
+    color: var(--gs-ink);
+  }
+  .btn-danger {
+    background: var(--gs-surface);
+    color: var(--gs-accent-ink);
+    border-color: var(--gs-accent);
+  }
+  .btn-danger:hover {
+    background: var(--gs-accent-tint);
+  }
+  /* .btn-success is deleted — success is not a button role here.
+     Focus ring comes from the base-layer button:focus-visible rule. */
+  .btn:disabled,
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-ghost:disabled,
+  .btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* inputs — same 2px, same zero radius */
+  .input-field,
+  .textarea-field,
+  .select-field {
+    /* /1.5 keeps the inherited line-height; the shorthand would reset it
+       to `normal` and shrink every multi-row textarea. */
+    font: 400 13px/1.5 var(--gs-font);
+    padding: 8px 12px;
+    background: var(--gs-surface);
+    color: var(--gs-ink);
+    border: 2px solid var(--gs-rule);
+    border-radius: var(--gs-radius);
+    transition: border-color 150ms;
+  }
+  .input-field::placeholder,
+  .textarea-field::placeholder {
+    color: var(--gs-ink-faint);
+  }
+  .input-field:focus,
+  .textarea-field:focus,
+  .select-field:focus {
+    border-color: var(--gs-ink);
+    outline: 2px solid var(--gs-accent);
+    outline-offset: 1px;
+  }
+  .input-field:disabled,
+  .textarea-field:disabled,
+  .select-field:disabled {
+    background: var(--gs-sunken);
+    cursor: not-allowed;
+  }
+  .textarea-field {
+    resize: none;
+  }
+  .select-field {
+    cursor: pointer;
+  }
+
+  .label-field {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gs-ink-muted);
+    margin-bottom: 0.25rem;
+  }
+
+  /* segmented control — a short, closed set of options laid out as one strip.
+     Built on native radios so keyboard, grouping and labelling come from the
+     platform; the input is visually hidden and the `.seg-face` beside it is
+     what draws.
+
+     Everything below hangs off `input + .seg-face` rather than
+     `.seg-option:has(input…)`. The sibling combinator is universally
+     supported, and selection is the one thing that must never fail to render:
+     under `:has()` an engine without support drops the rule entirely and the
+     strip becomes two identical grey labels with nothing chosen. Tauri's
+     `targets: "all"` puts this in front of WebKitGTK and WKWebView builds
+     older than `:has()`. */
+  .seg {
+    display: inline-flex;
+    border: 2px solid var(--gs-rule);
+    border-radius: var(--gs-radius);
+  }
+  .seg-option {
+    display: flex;
+    cursor: pointer;
+  }
+  .seg-option + .seg-option {
+    border-left: 2px solid var(--gs-rule);
+  }
+  .seg-face {
+    font: 600 13px var(--gs-font);
+    padding: 8px 16px;
+    color: var(--gs-ink-muted);
+    background: var(--gs-surface);
+    transition: background-color 150ms, color 150ms;
+  }
+  .seg-option:hover .seg-face {
+    background: var(--gs-sunken);
+  }
+  /* The accent's "primary action" job: this is the option that will be saved. */
+  .seg input:checked + .seg-face {
+    background: var(--gs-accent);
+    color: var(--gs-on-accent);
+  }
+  /* The ring lands on the option that has focus, not on the whole strip: an
+     sr-only input paints no ring of its own, and with nothing yet selected the
+     strip-wide ring left a keyboard user unable to see which option Space
+     would take.
+
+     Drawn inside the face, so its colour has to change with the ground it sits
+     on — an accent ring inset on the accent-filled selected option would be
+     invisible, which is precisely the option a keyboard user lands on first.
+
+     `:focus`, not `:focus-visible`: WebKit declined to match `:focus-visible`
+     on these radios once the pointer had been used earlier in the dialog, which
+     silently cost the keyboard path its only indicator. `.input-field:focus`
+     above already sets the same precedent, so a ring after a click is the
+     behaviour the rest of the app has. */
+  .seg input:focus + .seg-face {
+    outline: 2px solid var(--gs-ink);
+    outline-offset: -2px;
+  }
+  .seg input:checked:focus + .seg-face {
+    outline-color: var(--gs-on-accent);
+  }
+
+  /* surfaces — no shadow, no radius; a rule does the work */
+  .panel {
+    background: var(--gs-surface);
+    border: 2px solid var(--gs-ink);
+    padding: var(--gs-4);
+  }
+  .section-rule {
+    height: 2px;
+    background: var(--gs-rule-strong);
+  }
+
+  /* severity = weight, not hue */
+  .sev {
+    font: 700 9.5px var(--gs-mono);
+    letter-spacing: 0.06em;
+    padding: 3px 7px;
+  }
+  .sev-h {
+    background: var(--gs-accent);
+    color: var(--gs-on-accent);
+  }
+  .sev-m {
+    color: var(--gs-accent-ink);
+    box-shadow: inset 0 0 0 2px var(--gs-accent);
+  }
+  .sev-l {
+    color: var(--gs-ink-muted);
+    box-shadow: inset 0 0 0 1px var(--gs-on-ink);
+  }
+
+  /* status = a quiet ink chip; the icon distinguishes the state.
+     Not the accent — that has three jobs and status is not one of them, and a
+     register whose rows are mostly Open would drown the accent in noise. */
+  .st {
+    font: 700 9.5px var(--gs-mono);
+    letter-spacing: 0.06em;
+    padding: 3px 7px;
+    background: var(--gs-sunken);
+    color: var(--gs-ink-muted);
+  }
+  .st-open {
+    color: var(--gs-ink);
+  }
+
+  /* tables — ONE grammar for Discovery, Gaps and the four registries (#203) */
+  .tbl th {
+    background: var(--gs-ink);
+    color: var(--gs-on-ink);
+    font: 700 9.5px var(--gs-mono);
+    letter-spacing: 0.08em;
+    text-align: left;
+    padding: 11px var(--gs-4);
+  }
+  .tbl td {
+    /* 12 + 12 padding leaves a ~39px row on its own, so the floor is stated.
+       Preflight's border-box makes `height` on a cell behave as a minimum. */
+    height: 44px;
+    padding: var(--gs-3) var(--gs-4);
+    border-bottom: 1px solid var(--gs-rule-faint);
+    font: 400 12.5px var(--gs-font);
+  }
+  .tbl tbody tr:not([aria-selected="true"]):hover {
+    background: var(--gs-sunken);
+  }
+  .tbl tr[aria-selected="true"] {
+    background: var(--gs-accent-tint);
+  }
+  /* The 3px marker lives on the first cell, not the row: Preflight collapses
+     table borders, and `box-shadow` on a <tr> does not paint in the collapsed
+     model. Moving it to <td> also leaves <tr>'s own borders alone — StepRow's
+     4px drag-over rule still wins on width. A 1px row border does not: at equal
+     width the collapsed model prefers the cell, and solid over dashed, so
+     `.tbl td` above takes the edge. EditableRowTable's process-gap row restates
+     its dashed bottom on the cells for exactly that reason. */
+  .tbl tr[aria-selected="true"] > td:first-child {
+    box-shadow: inset 3px 0 0 var(--gs-accent);
+  }
+  /* Opt-out for rows that are chrome rather than data: the Discovery insert
+     zone is 4px tall and must not draw a rule between every pair of rows. */
+  .tbl td.tbl-bare {
+    height: auto;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  /* Pre-token classes, moved into the layer unchanged in shape. #202 took the
+     badge hues. #213 took the project list off `.card` — it draws `.proj` now
+     — so the two remaining call sites are `SipocView` and `ProjectSetupWizard`,
+     and the shadow and radius survive only there. Retiring the class outright
+     means restyling both, which is those screens' own work, not this one's. */
+  .card {
+    background-color: var(--gs-surface);
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    border: 1px solid #E5E7EB;
+    padding: 1rem;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  /* Three weights, no hues. Blue, amber and green are not in the palette, and
+     the accent is reserved. Every call site applies a modifier WITHOUT `.badge`,
+     so the base's padding never lands — these stay fills for that reason, since
+     an outline with no padding sits flush against the text. #213 took
+     `.badge-orange` off the project card's "Active" chip, a badge that said the
+     same word about every project ever created; the class stays because
+     `SystemsManager`'s usage-count chip is still on it. */
+  .badge-orange {
+    background-color: var(--gs-ink);
+    color: var(--gs-on-ink);
+  }
+  .badge-blue {
+    background-color: var(--gs-sunken);
+    color: var(--gs-ink);
+  }
+  .badge-gray {
+    background-color: var(--gs-sunken);
+    color: var(--gs-ink-muted);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Modal — one shell for every dialog (#204)                         */
+  /* ---------------------------------------------------------------- */
+
+  /* The backdrop is ink at 50%, not black: `bg-black bg-opacity-50` was
+     removed in Tailwind v4 and rendered fully opaque at all 23 call sites. */
+  .modal-backdrop,
+  .modal-layer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--gs-z-modal);
+  }
+  .modal-backdrop {
+    background: color-mix(in srgb, var(--gs-ink) 50%, transparent);
+  }
+  .modal-layer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--gs-4);
+  }
+  /* A dialog opened from inside another dialog. It clears the popover level
+     so a multi-select left open behind it cannot paint over it. */
+  .modal-above .modal-backdrop,
+  .modal-above .modal-layer {
+    z-index: var(--gs-z-modal-above);
+  }
+
+  .modal-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: calc(100vh - 2 * var(--gs-8));
+    background: var(--gs-surface);
+    border: 2px solid var(--gs-ink);
+    border-radius: var(--gs-radius);
+  }
+  .modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--gs-4);
+    padding: var(--gs-4) var(--gs-6);
+    border-bottom: 1px solid var(--gs-rule);
+  }
+  .modal-title {
+    font: 700 15px var(--gs-font);
+    color: var(--gs-ink);
+  }
+  .modal-description {
+    margin-top: var(--gs-1);
+    font: 400 13px/1.5 var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+  .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--gs-6);
+  }
+  /* Actions sit bottom-right. The 2px rule reads as the panel's own division;
+     1px would separate it from the body it belongs to. */
+  .modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--gs-2);
+    padding: var(--gs-4) var(--gs-6);
+    border-top: 2px solid var(--gs-rule-strong);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* System states — empty, loading, error (#205)                      */
+  /* ---------------------------------------------------------------- */
+
+  /* A panel, not a poster: it sits in the frame the filled state uses, so it
+     is ruled and left-aligned rather than centred in 128px of dead space. */
+  .state {
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-rule);
+    padding: var(--gs-6);
+  }
+  /* An error is the one place the accent's "look here" job applies to a
+     whole block, so it takes the 2px edge. */
+  .state-error {
+    border: 2px solid var(--gs-accent);
+  }
+  .state-title {
+    display: flex;
+    align-items: center;
+    gap: var(--gs-2);
+    font: 700 14px var(--gs-font);
+    color: var(--gs-ink);
+  }
+  .state-error .state-title {
+    color: var(--gs-accent-ink);
+  }
+  .state-message {
+    margin-top: var(--gs-2);
+    /* Prose measure: a sentence that runs the full width of a wide table is
+       not a sentence anyone reads. */
+    max-width: 62ch;
+    font: 400 13px/1.5 var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+  .state-action {
+    margin-top: var(--gs-4);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Board header and tab bar (#207)                                   */
+  /* ---------------------------------------------------------------- */
+
+  /* Identity owns line one, full bleed: the eyebrow and the name and nothing
+     else. Sharing that row with the toolbar is the layout bug behind #264, so
+     the separation is the fix; the name wraps to two lines before it clamps and
+     `title` carries the rest. `min-width: 0` is the floor #264 asked this row
+     to take as given — it shrinks rather than pushing the header wider. */
+  .board-identity {
+    min-width: 0;
+  }
+  .board-eyebrow {
+    font: 700 10px var(--gs-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gs-ink-faint);
+  }
+  .board-crumb:hover {
+    color: var(--gs-ink);
+    text-decoration: underline;
+  }
+  .board-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font: 800 26px/1.15 var(--gs-font);
+    color: var(--gs-ink);
+    text-wrap: pretty;
+  }
+  .board-meta {
+    font: 400 12.5px var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+
+  /* The state tag (#263) reads as part of the title, so it sits inline inside
+     the clamp rather than as a badge on the end. It reuses the severity weight
+     scale and adds no fourth job for the accent: `current` takes .sev-m's 2px
+     accent outline, `future` a quiet rule. A NULL state draws nothing at all. */
+  .project-state {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: var(--gs-2);
+    padding: 3px 7px;
+    font: 700 9.5px var(--gs-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .project-state-current {
+    color: var(--gs-accent-ink);
+    box-shadow: inset 0 0 0 2px var(--gs-accent);
+  }
+  .project-state-future {
+    color: var(--gs-ink-muted);
+    box-shadow: inset 0 0 0 2px var(--gs-rule);
+  }
+
+  /* Tabs sit at their natural width, left-aligned. `flex-1` used to stretch six
+     of them to ~260px each at 1600px, which is a nav bar pretending to be a
+     toolbar. */
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gs-2);
+    padding: var(--gs-3);
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    font: 600 13px var(--gs-font);
+    color: var(--gs-ink-muted);
+    white-space: nowrap;
+    transition: color 150ms, border-color 150ms;
+  }
+  .tab:hover {
+    color: var(--gs-ink);
+  }
+  .tab[aria-current="page"] {
+    color: var(--gs-ink);
+    border-bottom-color: var(--gs-accent);
+  }
+  .tab-count {
+    font: 700 9.5px var(--gs-mono);
+    letter-spacing: 0.06em;
+    color: var(--gs-ink-faint);
+  }
+  .tab[aria-current="page"] .tab-count {
+    color: var(--gs-ink-muted);
+  }
+  /* Working views left, registries right, one rule between them. */
+  .tab-divide {
+    align-self: center;
+    width: 1px;
+    height: 20px;
+    margin: 0 var(--gs-3);
+    background: var(--gs-rule);
+  }
+
+  /* 12b collapses the four registry counts to one and moves Export into an
+     overflow. The trigger is the *board's* width, not the window's: minWidth is
+     1024, but the 256px sidebar and the 320px right panel can leave the board at
+     ~448px, so a viewport media query would never fire where it is needed. */
+  .board-chrome {
+    container: board / inline-size;
+    /* Layout containment makes this a stacking context, so the header's menus
+       cannot lift themselves over the content area below on z-index alone.
+       Raising the whole strip is what keeps them above the diagram canvas. */
+    position: relative;
+    z-index: 1;
+  }
+  /* The wide layout is the default and the narrow one is the exception, so a
+     lost or renamed container declaration degrades to showing every control
+     rather than hiding four tabs and the Export button with no error. jsdom
+     does not evaluate container queries, so no test would catch the reverse. */
+  .brd-wide {
+    display: inline-flex;
+  }
+  .brd-narrow {
+    display: none;
+  }
+  @container board (max-width: 899px) {
+    .brd-wide {
+      display: none;
+    }
+    .brd-narrow {
+      display: inline-flex;
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Registry panel — a registry in the board, not in a dialog (#207)   */
+  /* ---------------------------------------------------------------- */
+
+  /* Same grammar as .modal-panel, minus the frame that made it a dialog: the
+     four registries are destinations now, so they are ruled panels in the page.
+     Their add/edit and delete confirmations stay dialogs. */
+  .registry {
+    background: var(--gs-surface);
+    border: 2px solid var(--gs-ink);
+  }
+  .registry-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--gs-4);
+    padding: var(--gs-4) var(--gs-6);
+    border-bottom: 1px solid var(--gs-rule);
+  }
+  .registry-title {
+    font: 700 15px var(--gs-font);
+    color: var(--gs-ink);
+  }
+  .registry-description {
+    margin-top: var(--gs-1);
+    max-width: 62ch;
+    font: 400 13px/1.5 var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+  .registry-body {
+    padding: var(--gs-6);
+  }
+  .registry-foot {
+    padding: var(--gs-3) var(--gs-6);
+    border-top: 2px solid var(--gs-rule-strong);
+    font: 400 13px var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Sidebar and toolbar (#208)                                        */
+  /* ---------------------------------------------------------------- */
+
+  /* The row has no horizontal room to give, so state is a one-letter mark in a
+     fixed-width column rather than a word. It never shrinks, and a NULL state
+     draws nothing. */
+  .side-state {
+    flex: 0 0 12px;
+    font: 700 10px var(--gs-mono);
+    line-height: 20px;
+    text-align: left;
+  }
+  .side-state-current {
+    color: var(--gs-accent);
+  }
+  .side-state-future {
+    color: var(--gs-ink-faint);
+  }
+  .side-label {
+    font: 700 10px var(--gs-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gs-ink-faint);
+  }
+  /* The active project keeps its 3px accent left edge; the rest of the row is
+     the same on both sides of that. */
+  .side-row {
+    display: block;
+    width: 100%;
+    padding: var(--gs-2) var(--gs-3);
+    border-left: 3px solid transparent;
+    text-align: left;
+  }
+  .side-row:hover {
+    background: var(--gs-sunken);
+  }
+  .side-row[aria-current="page"] {
+    background: var(--gs-accent-tint);
+    border-left-color: var(--gs-accent);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Project home — the project list (#213)                            */
+  /* ---------------------------------------------------------------- */
+
+  /* The page had its own shell: `min-h-screen bg-gray-50`, a `max-w-7xl`
+     centred column and `px-4 sm:px-6 lg:px-8`, which is a third page padding
+     in an app that already had two. The gutter is the board's 32px, and the
+     column is full bleed like the board's, so opening a project does not shift
+     the content sideways. */
+  /* 100vh, not 100%: this page is rendered straight into the router's outlet
+     with no sized ancestor, so a percentage height collapses to the content
+     and the ground ends halfway down the window. */
+  .home {
+    min-height: 100vh;
+    background: var(--gs-bg);
+  }
+  .home-head {
+    background: var(--gs-surface);
+    border-bottom: 2px solid var(--gs-rule-strong);
+    padding: var(--gs-4) var(--gs-8);
+  }
+  .home-body {
+    padding: var(--gs-8);
+  }
+  /* 12c: a ruled panel, not a floating tile. Column layout so the footer can be
+     pushed to the bottom edge and the rule above it lines up across a row of
+     cards of unequal height. */
+  .proj {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--gs-surface);
+    border: 2px solid var(--gs-ink);
+    padding: var(--gs-4);
+    text-align: left;
+    width: 100%;
+  }
+  .proj:hover {
+    background: var(--gs-sunken);
+  }
+  /* Opening a project is one empty button stretched over the whole card. That
+     is what makes the card clickable anywhere while still being a real
+     control — reachable by Tab, answering Enter and Space, which the old
+     `div` with an `onClick` did not. It carries no text of its own: putting it
+     around the name would sit a button between `-webkit-line-clamp` and the
+     text it counts lines of, and #264's two-line clamp would quietly stop
+     applying. Its accessible name is an `aria-label`. The tray sits above it
+     on z-index. */
+  .proj-open {
+    position: absolute;
+    inset: 0;
+  }
+  /* `outline-offset: -2px` keeps the ring inside the card's own 2px border
+     instead of drawing a second frame around it. */
+  .proj-open:focus-visible {
+    outline: 2px solid var(--gs-accent);
+    outline-offset: -2px;
+  }
+  /* Line one: the state tag and the date, so the tag and the name below it
+     scan down the column as a pair (12c). */
+  .proj-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: var(--gs-2);
+    min-height: 18px;
+    font: 400 12px var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+  /* The two-line clamp is the `line-clamp-2` utility on the element, not a
+     rule here — #264 owns that clamp and one mechanism should draw it. */
+  .proj-name {
+    margin-top: var(--gs-1);
+    font: 700 17px/1.2 var(--gs-font);
+    color: var(--gs-ink);
+    text-wrap: pretty;
+  }
+  .proj-description {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    margin-top: var(--gs-2);
+    font: 400 13px/1.45 var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+  /* `margin-top: auto` is what pins the footer to the bottom of a short card,
+     so the 1px rule sits at the same height across a row. */
+  .proj-foot {
+    margin-top: auto;
+    padding-top: var(--gs-3);
+    border-top: 1px solid var(--gs-rule-faint);
+    font: 400 12px var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+  .proj-foot strong {
+    font: 700 12px var(--gs-mono);
+    color: var(--gs-ink);
+  }
+  /* The state tag is `.project-state`, reused from the board header (#263).
+     There it sits inline inside an `h1` and needs a left margin to clear the
+     name; here it is the first thing on its own line, so the margin comes off
+     and the flex gap spaces it instead. */
+  .proj-eyebrow .project-state {
+    margin-left: 0;
+  }
+  /* Edit and delete. Opaque and above the open overlay, or the overlay would
+     swallow both clicks and open the project instead. The ground is inherited
+     rather than named: the tray is normally seen while the card is hovered, and
+     a literal `--gs-surface` would paint a white rectangle on the card's sunken
+     hover ground. Inheriting follows both states, including focus-within with
+     no hover. */
+  .proj-tray {
+    position: absolute;
+    z-index: 1;
+    top: var(--gs-2);
+    right: var(--gs-2);
+    display: flex;
+    align-items: center;
+    gap: var(--gs-1);
+    background-color: inherit;
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .proj:hover .proj-tray,
+  .proj-tray:focus-within {
+    opacity: 1;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* GapForm field grammar (#217)                                      */
+  /* ---------------------------------------------------------------- */
+
+  /* Chips — a closed set laid out as a wrapping row rather than a strip, for
+     when the options are words of unequal length (SIPOC field, root cause).
+     Same construction as `.seg`: a visually hidden native radio with a
+     `.chip-face` sibling doing the drawing, so keyboard, grouping and labelling
+     come from the platform and selection never depends on `:has()`. */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gs-2);
+  }
+  .chip {
+    display: inline-flex;
+    cursor: pointer;
+  }
+  .chip-face {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--gs-2);
+    font: 600 12.5px var(--gs-font);
+    padding: 6px 12px;
+    color: var(--gs-ink-muted);
+    background: var(--gs-surface);
+    /* Inset rather than a border so the face does not change size when the
+       1px unselected rule becomes the selected fill. */
+    box-shadow: inset 0 0 0 1px var(--gs-on-ink);
+    transition: background-color 150ms, color 150ms, box-shadow 150ms;
+  }
+  .chip:hover .chip-face {
+    background: var(--gs-sunken);
+    color: var(--gs-ink);
+  }
+  .chip input:checked + .chip-face {
+    background: var(--gs-ink);
+    color: var(--gs-on-ink);
+    box-shadow: inset 0 0 0 1px var(--gs-ink);
+  }
+  /* `:focus`, not `:focus-visible`, and the ring colour swaps on the selected
+     chip — both for the reasons spelled out on `.seg` above. */
+  .chip input:focus + .chip-face {
+    outline: 2px solid var(--gs-ink);
+    outline-offset: 1px;
+  }
+  .chip input:checked:focus + .chip-face {
+    outline-color: var(--gs-accent);
+  }
+  /* A mark inside the chip, for the field the form detected rather than the
+     user chose. Text, not a glyph: this is a data cell, not chrome. */
+  .chip-mark {
+    font: 500 10px var(--gs-font);
+    letter-spacing: 0.04em;
+  }
+
+  /* Severity as a segmented control. The selected face takes the weight scale
+     from `.sev` rather than one selection colour, because rule 3's third accent
+     job is *high* severity and not "whichever option is chosen" — picking Low
+     must not paint the strip red. */
+  .seg-sev input:checked + .seg-face {
+    background: var(--gs-rule-faint);
+    color: var(--gs-ink);
+  }
+  .seg-sev input:checked + .seg-face[data-sev="H"] {
+    background: var(--gs-accent);
+    color: var(--gs-on-accent);
+  }
+  .seg-sev input:checked + .seg-face[data-sev="M"] {
+    background: var(--gs-surface);
+    color: var(--gs-accent-ink);
+    box-shadow: inset 0 0 0 2px var(--gs-accent);
+  }
+  /* The ring is what makes "Low, chosen" different from "Low, not chosen": the
+     muted text colour is the same one every unselected face already carries, so
+     the faint fill on its own leaves selected-Low at 1.23:1 against unselected
+     and 1.13:1 against a hovered neighbour. `.sev-l` draws the same 1px inset
+     for the same reason. */
+  .seg-sev input:checked + .seg-face[data-sev="L"] {
+    background: var(--gs-rule-faint);
+    color: var(--gs-ink-muted);
+    box-shadow: inset 0 0 0 1px var(--gs-on-ink);
+  }
+  .seg-sev input:checked:focus + .seg-face[data-sev="M"],
+  .seg-sev input:checked:focus + .seg-face[data-sev="L"] {
+    outline-color: var(--gs-ink);
+  }
+
+  /* A quieter segmented control, for a scale whose selected value is not an
+     action and not a severity — Priority. Deliberately not the accent: rule 3
+     gives it three jobs and "the number 1" is not one of them. */
+  .seg-quiet .seg-option + .seg-option {
+    border-left-width: 1px;
+  }
+  .seg-quiet input:checked + .seg-face {
+    background: var(--gs-rule-faint);
+    color: var(--gs-ink);
+  }
+  .seg-quiet input:checked:focus + .seg-face {
+    outline-color: var(--gs-ink);
+  }
+
+  /* Section head inside a form — the 2px rule that replaces GapForm's
+     "Additional Details (Optional)" disclosure with structure. */
+  .form-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--gs-4);
+    padding-bottom: 9px;
+    border-bottom: 2px solid var(--gs-rule-strong);
+    margin-bottom: var(--gs-4);
+  }
+  .form-section-title {
+    font: 800 15px var(--gs-font);
+    color: var(--gs-ink);
+  }
+  /* Muted, not faint: the mock draws this #7d7979, which is not a token, and
+     --gs-ink-faint is 2.8:1 on white — under AA for a line the reader is meant
+     to read rather than an eyebrow label like `.side-label`. */
+  .form-section-note {
+    font: 400 11.5px var(--gs-font);
+    color: var(--gs-ink-muted);
+  }
+}

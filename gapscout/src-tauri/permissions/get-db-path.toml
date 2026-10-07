@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-get-db-path"
+description = "Allows reading the SQLite database path for Help → About diagnostics"
+commands.allow = ["get_db_path"]

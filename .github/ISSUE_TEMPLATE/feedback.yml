@@ -1,0 +1,26 @@
+name: Share feedback
+description: An idea, a missing feature, or something that was confusing.
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing GapScout. This issue is **public**, so please leave out anything confidential about the processes you map.
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Your feedback
+      description: What would make GapScout more useful to you?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: What you were trying to do
+      description: The task or process you were mapping, in general terms, helps us understand the need.
+  - type: input
+    id: version
+    attributes:
+      label: GapScout version
+      description: Shown in Help → About.
+      placeholder: 0.9.0

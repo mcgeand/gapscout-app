@@ -1,0 +1,22 @@
+/* Discovery Grid - Horizontal Scroll Indicators */
+
+/* Fade gradient on right edge when scrollable */
+.scroll-fade-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 80px;
+  background: linear-gradient(to right, transparent, white);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+/* Remove fade when scrolled to end */
+.scroll-fade-right.scrolled-to-end::after {
+  opacity: 0;
+}
+
