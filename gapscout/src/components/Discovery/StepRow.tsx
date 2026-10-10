@@ -1,11 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Check, TriangleAlert } from 'lucide-react'
+import { Check, SquarePen, TriangleAlert } from 'lucide-react'
 import type { Step, Milestone, Team, System } from '../../data/types'
 import type { EditableStep } from './types'
 import { createDebouncedSave, type SaveStatus } from '../../lib/autosave'
 import { validateStep } from '../../lib/sipocValidator'
-import { validateStepChain } from '../../lib/sipocChainValidator'
 import { milestonesById } from '../../lib/stepSequence'
 import {
   parseStepFieldValue,
@@ -15,6 +14,14 @@ import {
 import { MultiSelectDropdown } from './MultiSelectDropdown'
 import { ConfirmModal } from '../shared/ConfirmModal'
 import { Empty } from '../shared/Empty'
+
+/** Discovery empty-cell hint — faint copy, not the shared bare em-dash (#209). */
+function EmptyHint({ label }: { label: string }) {
+  return <span className="text-gs-ink-faint">— add {label}</span>
+}
+
+const ENTITY_CHIP =
+  'inline-flex h-5 items-center px-2 py-0 rounded text-xs leading-none border border-gs-rule text-gs-ink'
 
 /** Fields whose editor is MultiSelectDropdown rather than a text/number/select input. */
 const DROPDOWN_FIELDS = ['suppliers', 'customers']
@@ -62,6 +69,11 @@ interface StepRowProps {
    * "Save Step" would otherwise persist the last committed state.
    */
   onPendingEditChange?: (pending: PendingStepEdit | null) => void
+  /**
+   * Opens the full step editor (Trigger, Notes, systems, …). Discovery dropped
+   * those columns in #209; this is the path back into them from the grid.
+   */
+  onOpenDetails?: () => void
   isDragging?: boolean
   isDragOver?: boolean
   onDragStart?: (e: React.DragEvent) => void
@@ -84,6 +96,7 @@ export function StepRow({
   onToggleSelect,
   onUpdate,
   onPendingEditChange,
+  onOpenDetails,
   isDragging,
   isDragOver,
   onDragStart,
@@ -250,12 +263,6 @@ export function StepRow({
     }
   }
 
-  const getEntityType = (entityName: string): 'team' | 'system' | null => {
-    if (teams.find((t) => t.name === entityName)) return 'team'
-    if (systems.find((s) => s.name === entityName)) return 'system'
-    return null
-  }
-
   const handleAutofillRequest = (field: 'suppliers' | 'inputs') => {
     const hasExistingData =
       field === 'suppliers' ? step.suppliers.length > 0 : step.inputs.length > 0
@@ -289,23 +296,13 @@ export function StepRow({
   // The badge's first/last exemption ranks on (milestone.order, step.order), so
   // it needs the milestones the row already has as a prop (#344).
   const milestoneById = milestonesById(milestones)
-  // Indexed against the unfiltered list: validateStepChain walks by position,
-  // so the visible-row index would make it read the wrong neighbour and
-  // contradict the badge below whenever a filter is active.
-  const validationIndex = validationSteps.findIndex((s) => s.id === step.id)
-  const validation = validateStepChain(
-    step,
-    validationSteps,
-    validationIndex === -1 ? index : validationIndex
-  )
-  const [showTooltip, setShowTooltip] = useState(false)
 
   return (
     <>
       <tr
         aria-selected={isSelected}
         className={`transition-all ${isDragging ? 'opacity-50' : ''} ${
-          isDragOver ? 'border-t-4 border-t-orange-500' : ''
+          isDragOver ? 'border-t-4 border-t-gs-ink' : ''
         }`}
         draggable={!editingField}
         onDragStart={onDragStart}
@@ -396,7 +393,7 @@ export function StepRow({
               />
             ) : (
               <span
-                className="flex-1 text-gray-700 font-medium cursor-pointer hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                className="flex-1 text-gs-ink font-medium cursor-pointer hover:bg-gs-sunken rounded transition-colors"
                 onClick={() => handleStartEdit('order', step.order.toString())}
                 title="Click to edit order number"
               >
@@ -412,7 +409,7 @@ export function StepRow({
               (s) => s.order === step.order && s.milestoneId === step.milestoneId
             ).length > 1 && (
               <span
-                className="text-purple-600 text-xs font-bold"
+                className="text-xs font-bold text-gs-ink-muted"
                 title={`Parallel step (runs at same time as other steps at position ${displayNumber ?? step.order})`}
               >
                 ∥
@@ -507,29 +504,15 @@ export function StepRow({
             >
               {step.suppliers.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
-                  {step.suppliers.map((supplier) => {
-                    const type = getEntityType(supplier)
-                    const isTeam = type === 'team'
-                    const isSystem = type === 'system'
-                    return (
-                      <span
-                        key={supplier}
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
-                          isTeam
-                            ? 'bg-blue-100 text-blue-800'
-                            : isSystem
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {supplier}
-                      </span>
-                    )
-                  })}
+                  {step.suppliers.map((supplier) => (
+                    <span key={supplier} className={ENTITY_CHIP}>
+                      {supplier}
+                    </span>
+                  ))}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Empty />
+                  <EmptyHint label="supplier" />
                   {index > 0 && allSteps[index - 1] && (
                     <button
                       className="btn-secondary text-xs px-2 py-1 whitespace-nowrap"
@@ -573,7 +556,7 @@ export function StepRow({
                 step.inputs.join(', ')
               ) : (
                 <div className="flex items-center gap-2">
-                  <Empty />
+                  <EmptyHint label="inputs" />
                   {index > 0 && allSteps[index - 1] && (
                     <button
                       className="btn-secondary text-xs px-2 py-1 whitespace-nowrap"
@@ -609,12 +592,27 @@ export function StepRow({
               placeholder="Enter process step..."
             />
           ) : (
-            <div
-              className="cursor-pointer hover:bg-gray-100 rounded font-medium"
-              style={{ color: 'var(--color-deep-navy)' }}
-              onClick={() => handleStartEdit('label', step.label)}
-            >
-              {step.label || '(empty)'}
+            <div className="flex items-center gap-gs-2">
+              <div
+                className="min-w-0 flex-1 cursor-pointer rounded font-semibold text-[13px] text-gs-ink hover:bg-gs-sunken"
+                onClick={() => handleStartEdit('label', step.label)}
+              >
+                {step.label || '(empty)'}
+              </div>
+              {onOpenDetails && !step._isNew && (
+                <button
+                  type="button"
+                  className="btn-ghost shrink-0 inline-flex h-5 w-5 items-center justify-center p-0"
+                  title="Edit step details (trigger, notes, …)"
+                  aria-label="Edit step details"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenDetails()
+                  }}
+                >
+                  <SquarePen size={16} strokeWidth={2} />
+                </button>
+              )}
             </div>
           )}
         </td>
@@ -640,7 +638,11 @@ export function StepRow({
               className="cursor-pointer hover:bg-gray-100 rounded text-sm"
               onClick={() => handleStartEdit('outputs', step.outputs)}
             >
-              {step.outputs.length > 0 ? step.outputs.join(', ') : <Empty />}
+              {step.outputs.length > 0 ? (
+                step.outputs.join(', ')
+              ) : (
+                <EmptyHint label="output" />
+              )}
             </div>
           )}
         </td>
@@ -664,122 +666,17 @@ export function StepRow({
             >
               {step.customers.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
-                  {step.customers.map((customer) => {
-                    const type = getEntityType(customer)
-                    const isTeam = type === 'team'
-                    const isSystem = type === 'system'
-                    return (
-                      <span
-                        key={customer}
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
-                          isTeam
-                            ? 'bg-blue-100 text-blue-800'
-                            : isSystem
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {customer}
-                      </span>
-                    )
-                  })}
+                  {step.customers.map((customer) => (
+                    <span key={customer} className={ENTITY_CHIP}>
+                      {customer}
+                    </span>
+                  ))}
                 </div>
               ) : (
-                <Empty />
+                <EmptyHint label="customer" />
               )}
             </div>
           )}
-        </td>
-
-        <td>
-          {editingField === 'trigger' ? (
-            <input
-              type="text"
-              className="input-field w-full"
-              autoFocus
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={() => handleSaveEdit('trigger')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveEdit('trigger')
-                if (e.key === 'Escape') handleCancelEdit()
-              }}
-              placeholder="What starts this?"
-            />
-          ) : (
-            <div
-              className="cursor-pointer hover:bg-gray-100 rounded text-sm"
-              onClick={() => handleStartEdit('trigger', step.trigger || '')}
-            >
-              {step.trigger || <Empty />}
-            </div>
-          )}
-        </td>
-
-        <td>
-          {editingField === 'notes' ? (
-            <input
-              type="text"
-              className="input-field w-full"
-              autoFocus
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={() => handleSaveEdit('notes')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveEdit('notes')
-                if (e.key === 'Escape') handleCancelEdit()
-              }}
-              placeholder="Additional notes..."
-            />
-          ) : (
-            <div
-              className="cursor-pointer hover:bg-gray-100 rounded text-sm"
-              onClick={() => handleStartEdit('notes', step.notes || '')}
-            >
-              {step.notes || <Empty />}
-            </div>
-          )}
-        </td>
-
-        <td className="text-center relative">
-          <div
-            className="inline-block cursor-help"
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
-          >
-            {validation.status === 'perfect' && (
-              <span className="text-green-600" title={validation.message}>
-                ✓
-              </span>
-            )}
-            {validation.status === 'warning' && (
-              <span className="text-orange-500" title={validation.message}>
-                ⚠
-              </span>
-            )}
-            {validation.status === 'broken' && (
-              <span className="text-red-600" title={validation.message}>
-                ✗
-              </span>
-            )}
-            {(validation.status === 'end' || validation.status === 'start') && (
-              <span className="text-gray-400" title={validation.message}>
-                ○
-              </span>
-            )}
-
-            {showTooltip && validation.details.length > 0 && (
-              <div className="absolute z-50 right-0 top-full mt-1 w-80 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3">
-                <div className="font-semibold mb-2">{validation.message}</div>
-                {validation.details.map((detail, idx) => (
-                  <div key={idx} className="mb-1 whitespace-pre-wrap">
-                    {detail}
-                  </div>
-                ))}
-                <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
-              </div>
-            )}
-          </div>
         </td>
       </tr>
 

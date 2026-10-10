@@ -151,6 +151,7 @@ const gridProps = {
   onRequestCancelNewRow: vi.fn(),
   onRequestCancelWithConfirm: vi.fn(),
   onShowValidationWarning: vi.fn(),
+  onOpenStepDetails: vi.fn(),
 }
 
 const seedStores = (gaps: Gap[] = [inputGap], step: EditableStep = midStep) => {
@@ -189,7 +190,7 @@ async function fillInputsInGrid() {
     row.textContent?.includes(midStep.label)
   )
   const inputsCell = stepRow!.querySelectorAll('td')[5] as HTMLElement
-  fireEvent.click(within(inputsCell).getByText('—'))
+  fireEvent.click(within(inputsCell).getByText(/— add inputs/))
   const editor = screen.getByPlaceholderText('Request, Data...')
   fireEvent.change(editor, { target: { value: 'Purchase request' } })
   fireEvent.blur(editor)

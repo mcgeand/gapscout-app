@@ -320,6 +320,35 @@
     outline-color: var(--gs-on-accent);
   }
 
+  /* Ink-selected segment — Discovery milestones (#209). Active tab is identity
+     chrome, not a primary action, so it takes ink / on-ink rather than accent. */
+  .seg-ink input:checked + .seg-face {
+    background: var(--gs-ink);
+    color: var(--gs-on-ink);
+  }
+  .seg-ink input:checked:focus + .seg-face {
+    outline-color: var(--gs-on-ink);
+  }
+  /* Trailing + sits inside the same 2px box as the options. */
+  .seg-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 2px solid var(--gs-rule);
+    padding: 8px 12px;
+    color: var(--gs-ink-muted);
+    background: var(--gs-surface);
+    cursor: pointer;
+  }
+  .seg-add:hover {
+    background: var(--gs-sunken);
+    color: var(--gs-ink);
+  }
+  .seg-add:focus {
+    outline: 2px solid var(--gs-ink);
+    outline-offset: -2px;
+  }
+
   /* surfaces — no shadow, no radius; a rule does the work */
   .panel {
     background: var(--gs-surface);
@@ -381,10 +410,13 @@
     border-bottom: 1px solid var(--gs-rule-faint);
     font: 400 12.5px var(--gs-font);
   }
-  .tbl tbody tr:not([aria-selected="true"]):hover {
+  .tbl tbody tr:not([aria-selected="true"]):not([data-row="gap"]):hover {
     background: var(--gs-sunken);
   }
-  .tbl tr[aria-selected="true"] {
+  /* Selected rows and process-gap rows share the accent tint + 3px edge.
+     Gaps use `data-row="gap"` rather than lying with `aria-selected` (#209). */
+  .tbl tr[aria-selected="true"],
+  .tbl tr[data-row="gap"] {
     background: var(--gs-accent-tint);
   }
   /* The 3px marker lives on the first cell, not the row: Preflight collapses
@@ -394,7 +426,8 @@
      width the collapsed model prefers the cell, and solid over dashed, so
      `.tbl td` above takes the edge. EditableRowTable's process-gap row restates
      its dashed bottom on the cells for exactly that reason. */
-  .tbl tr[aria-selected="true"] > td:first-child {
+  .tbl tr[aria-selected="true"] > td:first-child,
+  .tbl tr[data-row="gap"] > td:first-child {
     box-shadow: inset 3px 0 0 var(--gs-accent);
   }
   /* Opt-out for rows that are chrome rather than data: the Discovery insert

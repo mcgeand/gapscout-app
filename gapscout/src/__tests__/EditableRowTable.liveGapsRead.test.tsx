@@ -181,6 +181,7 @@ const props = {
   onRequestCancelNewRow: vi.fn(),
   onRequestCancelWithConfirm: vi.fn(),
   onShowValidationWarning: vi.fn(),
+  onOpenStepDetails: vi.fn(),
 }
 
 const createdGapsFor = (stepId: string) =>

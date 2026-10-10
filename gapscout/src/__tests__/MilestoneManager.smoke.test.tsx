@@ -59,7 +59,7 @@ describe('MilestoneManager — smoke', () => {
         milestones={[]}
         activeMilestoneId={null}
         onSelectMilestone={vi.fn()}
-        onMilestoneCreated={vi.fn()}
+        onMilestonesChanged={vi.fn()}
       />
     )
     expect(container).toBeInTheDocument()
@@ -72,7 +72,7 @@ describe('MilestoneManager — smoke', () => {
         milestones={[MILESTONE]}
         activeMilestoneId="m-1"
         onSelectMilestone={vi.fn()}
-        onMilestoneCreated={vi.fn()}
+        onMilestonesChanged={vi.fn()}
       />
     )
     expect(container.querySelector('div')).toBeInTheDocument()
@@ -94,7 +94,7 @@ describe('MilestoneManager — a refused order reaches the user', () => {
         name: 'MilestoneOrderConflictError',
       })
     )
-    const onMilestoneCreated = vi.fn()
+    const onMilestonesChanged = vi.fn()
 
     render(
       <MilestoneManager
@@ -102,7 +102,7 @@ describe('MilestoneManager — a refused order reaches the user', () => {
         milestones={[MILESTONE]}
         activeMilestoneId={null}
         onSelectMilestone={vi.fn()}
-        onMilestoneCreated={onMilestoneCreated}
+        onMilestonesChanged={onMilestonesChanged}
       />
     )
 
@@ -114,7 +114,7 @@ describe('MilestoneManager — a refused order reaches the user', () => {
       )
     })
     expect(mockToast.success).not.toHaveBeenCalled()
-    expect(onMilestoneCreated).not.toHaveBeenCalled()
+    expect(onMilestonesChanged).not.toHaveBeenCalled()
   })
 
   it('keeps the generic line for every other failure', async () => {
@@ -126,7 +126,7 @@ describe('MilestoneManager — a refused order reaches the user', () => {
         milestones={[MILESTONE]}
         activeMilestoneId={null}
         onSelectMilestone={vi.fn()}
-        onMilestoneCreated={vi.fn()}
+        onMilestonesChanged={vi.fn()}
       />
     )
 

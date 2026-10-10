@@ -32,13 +32,11 @@ import { openSlotForInsert, resealAfterMutation } from '../../state/sequenceOps'
 import { StepRow } from './StepRow'
 
 /**
- * The process-gap row is framed in dashed orange on the <tr>. Under the collapsed
- * border model Preflight applies, a cell border outranks a row border at equal
- * width and solid outranks dashed, so `.tbl td`'s 1px solid rule would win the
- * bottom edge and leave the row half-framed. The cells restate the dashed edge
- * as a utility, which beats the component layer.
+ * Process-gap rows use accent tint + dashed rule (not brand orange — never a
+ * status). Under Preflight's collapsed borders a cell border outranks a row
+ * border at equal width, so the cells restate the dashed bottom edge.
  */
-const GAP_ROW_CELL = 'border-b border-dashed border-orange-200'
+const GAP_ROW_CELL = 'border-b border-dashed border-gs-rule'
 
 export type StepOrGap =
   | (EditableStep & { _type: 'step' })
@@ -88,6 +86,8 @@ interface EditableRowTableProps {
     missingFields: string[]
     pendingUpdates: Partial<Step>
   }) => void
+  /** Opens StepEditModal for Trigger/Notes and the rest of the step (#209). */
+  onOpenStepDetails: (step: EditableStep) => void
 }
 
 export function EditableRowTable({
@@ -120,6 +120,7 @@ export function EditableRowTable({
   onRequestCancelNewRow,
   onRequestCancelWithConfirm,
   onShowValidationWarning,
+  onOpenStepDetails,
 }: EditableRowTableProps) {
   const {
     updateStep: updateStepInStore,
@@ -134,10 +135,9 @@ export function EditableRowTable({
   const [pendingEdits, setPendingEdits] = useState<Record<string, PendingStepEdit>>({})
 
   // Every step, in process order. Validation reads neighbours, so it has to see
-  // rows a filter is hiding — and `validateStepChain` walks by array index, so
-  // the list has to be sorted rather than left in store order. `order` is scoped
-  // to its milestone (#299), so the sort ranks by (milestone order, step order);
-  // a flat sort handed the chain a neighbour from the wrong milestone.
+  // rows a filter is hiding. `order` is scoped to its milestone (#299), so the
+  // sort ranks by (milestone order, step order); a flat sort handed the
+  // validator a neighbour from the wrong milestone.
   const milestoneById = useMemo(() => milestonesById(milestones), [milestones])
   const validationSteps = useMemo(
     () => [...steps].sort((a, b) => compareSteps(a, b, milestoneById)),
@@ -248,8 +248,8 @@ export function EditableRowTable({
                 }}
               />
             </th>
-            <th className="text-center w-16" title="Validation Status">
-              <TriangleAlert size={16} strokeWidth={2} aria-label="Validation status" />
+            <th className="text-center w-16" title="SIPOC completeness">
+              SIPOC
             </th>
             <th className="w-28">#</th>
             <th className="min-w-[120px]">Milestone</th>
@@ -258,9 +258,6 @@ export function EditableRowTable({
             <th className="min-w-[200px]">Process</th>
             <th className="min-w-[150px]">Output</th>
             <th className="min-w-[150px]">Customer</th>
-            <th className="min-w-[120px]">Trigger</th>
-            <th className="min-w-[150px]">Notes</th>
-            <th>SIPOC</th>
           </tr>
         </thead>
         <tbody>
@@ -268,12 +265,12 @@ export function EditableRowTable({
             <React.Fragment key={item._type === 'step' ? item.id : `gap-${item.id}`}>
               {/* Insert zone before row */}
               <tr
-                className="group hover:bg-orange-50 transition-colors"
+                className="group hover:bg-gs-sunken transition-colors"
                 style={{ height: hoveredInsertIndex === idx ? '48px' : '4px' }}
                 onMouseEnter={() => setHoveredInsertIndex(idx)}
                 onMouseLeave={() => setHoveredInsertIndex(null)}
               >
-                <td colSpan={12} className="tbl-bare text-center">
+                <td colSpan={9} className="tbl-bare text-center">
                   {hoveredInsertIndex === idx && (
                     <div className="flex items-center justify-center gap-4 py-2">
                       <button
@@ -307,8 +304,12 @@ export function EditableRowTable({
 
               {/* Actual step or gap row */}
               {item._type === 'gap' ? (
-                /* Process Gap Row */
-                <tr className="bg-orange-50 border-l-4 border-orange-400 border-y border-r border-dashed border-orange-200 hover:bg-orange-100 transition-colors">
+                /* Process Gap Row — tint via data-row="gap". Not selectable:
+                   bulk delete only acts on steps (#209 / #490 review). */
+                <tr
+                  data-row="gap"
+                  className="border-y border-r border-dashed border-gs-rule transition-colors"
+                >
                   <td className={GAP_ROW_CELL}>
                     <input
                       type="checkbox"
@@ -319,35 +320,38 @@ export function EditableRowTable({
                   <td className={`text-center text-gs-accent ${GAP_ROW_CELL}`}>
                     <TriangleAlert size={16} strokeWidth={2} aria-label="Process gap" className="inline" />
                   </td>
-                  <td className={`font-mono text-orange-800 font-bold ${GAP_ROW_CELL}`}>
+                  <td className={`font-mono font-bold text-gs-ink ${GAP_ROW_CELL}`}>
                     {displayNumbers?.get(item.id) ?? item.order}
                   </td>
-                  <td colSpan={6} className={GAP_ROW_CELL}>
+                  <td colSpan={4} className={GAP_ROW_CELL}>
                     <div className="flex items-center gap-2">
                       <TriangleAlert size={16} strokeWidth={2} className="text-gs-accent shrink-0" />
-                      <div className="flex-1">
-                        <span className="font-semibold text-orange-900">Process Gap: </span>
-                        <span className="italic text-orange-800">{item.observed || 'Unknown process step'}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-semibold text-gs-ink">Process Gap: </span>
+                        <span className="italic text-gs-ink-muted">{item.observed || 'Unknown process step'}</span>
                       </div>
                     </div>
                   </td>
-                  <td colSpan={3} className={GAP_ROW_CELL}>
-                    <div className="flex items-center gap-2">
+                  <td colSpan={2} className={GAP_ROW_CELL}>
+                    <div className="flex items-center gap-1">
                       <button
+                        type="button"
                         onClick={() => onEditProcessGap(item)}
-                        className="btn-secondary text-xs px-2 py-1 whitespace-nowrap"
+                        className="btn-secondary h-5 px-1.5 py-0 text-[11px] leading-none whitespace-nowrap"
                       >
                         Edit Gap
                       </button>
                       <button
+                        type="button"
                         onClick={() => onCloseProcessGap(item)}
-                        className="btn-secondary text-xs px-2 py-1 whitespace-nowrap"
+                        className="btn-secondary h-5 px-1.5 py-0 text-[11px] leading-none whitespace-nowrap"
                       >
                         Close Gap
                       </button>
                       <button
+                        type="button"
                         onClick={() => onRequestDeleteGap(item)}
-                        className="btn-secondary text-xs px-2 py-1 whitespace-nowrap"
+                        className="btn-secondary h-5 px-1.5 py-0 text-[11px] leading-none whitespace-nowrap"
                       >
                         Delete Gap
                       </button>
@@ -377,6 +381,9 @@ export function EditableRowTable({
                     item._isNew
                       ? (pending) => handlePendingEditChange(item.id, pending)
                       : undefined
+                  }
+                  onOpenDetails={
+                    item._isNew ? undefined : () => onOpenStepDetails(item)
                   }
               onUpdate={async (updates, options) => {
                 try {
@@ -549,8 +556,8 @@ export function EditableRowTable({
 
             {/* Save/Cancel Tray for New Rows (only for steps, not gaps) */}
             {item._type === 'step' && item._isNew && (
-              <tr className="bg-blue-50 border-t border-blue-200">
-                <td colSpan={12}>
+              <tr className="border-t border-gs-rule bg-gs-sunken">
+                <td colSpan={9}>
                   {(() => {
                     // Fold in whatever the still-open cell editor holds, so the
                     // indicator, the Save button's enabled state, and the write
@@ -565,7 +572,7 @@ export function EditableRowTable({
                           {!validation.isValid ? (
                             <>
                               <TriangleAlert size={16} strokeWidth={2} className="text-gs-accent" />
-                              <span className="text-sm text-amber-700">
+                              <span className="text-sm text-gs-accent-ink">
                                 {getNewRowValidationMessage(validation)}
                               </span>
                             </>

@@ -146,9 +146,15 @@ function validateJiraUrl(url: string): boolean {
   }
 }
 
-type GapFormInnerProps = Omit<GapFormProps, 'isOpen'>
+type GapFormInnerProps = Omit<GapFormProps, 'isOpen'> & {
+  /**
+   * Asks the wrapper to remount this form in edit mode on an existing gap.
+   * Only the gap-vs-gap order conflict uses it (#229).
+   */
+  onEditExisting?: (gap: Gap) => void
+}
 
-function GapFormInner({ onClose, projectId, mode, gap, prefilledStepId, prefilledOrder, prefilledDisplayOrder, prefilledMilestoneId, displayNumbers }: GapFormInnerProps) {
+function GapFormInner({ onClose, onEditExisting, projectId, mode, gap, prefilledStepId, prefilledOrder, prefilledDisplayOrder, prefilledMilestoneId, displayNumbers }: GapFormInnerProps) {
   const { steps, milestones } = useStepsStore()
   const { teams } = useTeamsStore()
   const { addGap, updateGap, closeGap } = useGapsStore()
@@ -1171,21 +1177,26 @@ function GapFormInner({ onClose, projectId, mode, gap, prefilledStepId, prefille
               </p>
               <p className="mt-gs-3">
                 {orderConflict.conflictType === 'gap'
-                  ? 'Would you like to update the existing gap or create a new gap before/after it?'
+                  ? 'Would you like to update the existing gap, or place this gap before or after it?'
                   : 'Would you like to place this gap before or after the existing step?'}
               </p>
             </>
           }
           options={[
-            ...(orderConflict.conflictType === 'gap'
+            ...(orderConflict.conflictType === 'gap' && onEditExisting
               ? [
                   {
-                    label: 'Update Existing Gap',
+                    label: 'Update existing gap',
                     style: 'secondary' as const,
                     onClick: () => {
+                      // Switch to edit mode on the gap already holding this order.
+                      // The new-gap draft is discarded on purpose: Observed and
+                      // Expected are NOT carried across, because the existing gap's
+                      // text would otherwise be silently overwritten by (or merged
+                      // with) what was typed for a different gap. The wrapper remounts
+                      // the form keyed on the existing gap's id, pre-filled from it.
                       setOrderConflict(null)
-                      toast('Update existing gap feature coming soon!')
-                      // TODO: Pre-fill form with existing gap data
+                      onEditExisting(orderConflict.conflictItem as Gap)
                     },
                   },
                 ]
@@ -1310,10 +1321,29 @@ function GapFormInner({ onClose, projectId, mode, gap, prefilledStepId, prefille
 }
 
 export default function GapForm(props: GapFormProps) {
-  const { isOpen, ...inner } = props
-  if (!isOpen) return null
-  // Re-key by gap.id so reopening with a different gap (or switching create↔edit)
-  // remounts the inner form with fresh state derived from props.
-  return <GapFormInner key={props.gap?.id ?? 'new'} {...inner} />
+  if (!props.isOpen) return null
+  // A separate component so the create→edit switch below is session state: it
+  // unmounts with the modal, and a reopen starts from the caller's props again.
+  return <GapFormSession {...props} />
 }
 
+function GapFormSession(props: GapFormProps) {
+  const inner: Omit<GapFormProps, 'isOpen'> = props
+  // The gap-vs-gap order conflict can hand a create over to editing the gap that
+  // already holds the position (#229). The modal stays open; only the inner form
+  // remounts, so this lifts `mode`/`gap` out of the props for the session.
+  const [switchedTo, setSwitchedTo] = useState<Gap | null>(null)
+  const mode = switchedTo ? 'edit' : inner.mode
+  const gap = switchedTo ?? inner.gap
+  // Re-key by gap.id so reopening with a different gap (or switching create↔edit)
+  // remounts the inner form with fresh state derived from props.
+  return (
+    <GapFormInner
+      key={gap?.id ?? 'new'}
+      {...inner}
+      mode={mode}
+      gap={gap}
+      onEditExisting={mode === 'create' ? setSwitchedTo : undefined}
+    />
+  )
+}

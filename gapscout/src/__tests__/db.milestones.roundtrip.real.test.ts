@@ -262,8 +262,33 @@ describe("milestone CRUD on the real SQL.js FTS5 engine", () => {
     const otherTeamId = await createTeam({ projectId: otherProjectId, name: "Operations", color: "#201e1d", order: 0, tags: [] });
     await createStep(stepData(otherProjectId, otherTeamId, otherMilestoneId, "Other project's step", 0));
 
-    expect(await getMilestoneUsageCount(usedId, projectId)).toBe(2);
-    expect(await getMilestoneUsageCount(unusedId, projectId)).toBe(0);
+    expect(await getMilestoneUsageCount(usedId, projectId)).toEqual({ steps: 2, processGaps: 0 });
+    expect(await getMilestoneUsageCount(unusedId, projectId)).toEqual({ steps: 0, processGaps: 0 });
+  });
+
+  it("counts process gaps (order_num set) in a milestone, but not step-attached gaps without one", async () => {
+    const milestoneId = await createMilestone({ projectId, name: "Intake", order: 0, relatedPolicies: [] });
+    const gapOnlyId = await createMilestone({ projectId, name: "Review", order: 1, relatedPolicies: [] });
+    const teamId = await createTeam({ projectId, name: "Operations", color: "#201e1d", order: 0, tags: [] });
+    const stepId = await createStep(stepData(projectId, teamId, milestoneId, "Receive request", 0));
+
+    const base = {
+      projectId,
+      observed: "Observed",
+      expected: "Expected",
+      severity: "M" as const,
+      status: "Open" as const,
+      links: [],
+    };
+    // A plain step gap: no order_num, rides on its step, never counted.
+    await createGap({ ...base, stepId, milestoneId });
+    // Two process gaps in the gap-only milestone, one in the other.
+    await createGap({ ...base, milestoneId: gapOnlyId, order: 0 });
+    await createGap({ ...base, milestoneId: gapOnlyId, order: 1 });
+    await createGap({ ...base, milestoneId, order: 1 });
+
+    expect(await getMilestoneUsageCount(gapOnlyId, projectId)).toEqual({ steps: 0, processGaps: 2 });
+    expect(await getMilestoneUsageCount(milestoneId, projectId)).toEqual({ steps: 1, processGaps: 1 });
   });
 
   it("rejects deleting a milestone a step still references, via ON DELETE RESTRICT", async () => {

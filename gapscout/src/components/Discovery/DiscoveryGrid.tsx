@@ -40,6 +40,7 @@ import { captureProjectScope, isProjectScopeCurrent } from '../../state/workspac
 import '../../styles/discovery.css'
 import { Link2, Plus } from 'lucide-react'
 import { EmptyState } from '../shared/EmptyState'
+import StepEditModal from '../Diagram/StepEditModal'
 
 interface DiscoveryGridProps {
   projectId: string
@@ -124,6 +125,9 @@ export default function DiscoveryGrid({ projectId }: DiscoveryGridProps) {
   // Delete gap confirmation
   const [showDeleteGapConfirm, setShowDeleteGapConfirm] = useState(false)
   const [gapToDelete, setGapToDelete] = useState<Gap | null>(null)
+
+  // Full step editor — Trigger/Notes left the grid in #209; this is the path back.
+  const [editingStep, setEditingStep] = useState<EditableStep | null>(null)
   
   // Gaps store for creating/updating gaps
   const {
@@ -607,12 +611,14 @@ export default function DiscoveryGrid({ projectId }: DiscoveryGridProps) {
   }
 
   // Show delete confirmation modal
+  const selectedStepCount = steps.filter((s) => selectedIds.has(s.id)).length
+
   const handleDeleteClick = () => {
-    if (selectedIds.size === 0) {
+    if (selectedStepCount === 0) {
       console.log('No steps selected for deletion')
       return
     }
-    console.log(`Opening delete confirmation for ${selectedIds.size} steps`)
+    console.log(`Opening delete confirmation for ${selectedStepCount} steps`)
     setShowDeleteConfirm(true)
   }
 
@@ -620,13 +626,16 @@ export default function DiscoveryGrid({ projectId }: DiscoveryGridProps) {
   const confirmDelete = async () => {
     const scope = captureProjectScope(projectId)
     if (!scope) return
-    console.log(`Confirming deletion of ${selectedIds.size} selected steps:`, Array.from(selectedIds))
+    const stepsToDelete = steps.filter((s) => selectedIds.has(s.id))
+    console.log(
+      `Confirming deletion of ${stepsToDelete.length} selected steps:`,
+      stepsToDelete.map((s) => s.id)
+    )
     setShowDeleteConfirm(false)
 
     try {
-      const stepsToDelete = steps.filter(s => selectedIds.has(s.id))
       console.log('Steps to delete:', stepsToDelete.map(s => ({ id: s.id, label: s.label, isNew: s._isNew })))
-      
+
       // ZIP-148 Phase 2: Check if any steps have open gaps. Off the store, not
       // the render-time `gaps` prop, same reason as the loop below (#261).
       const liveGaps = useGapsStore.getState().gaps
@@ -1155,29 +1164,24 @@ export default function DiscoveryGrid({ projectId }: DiscoveryGridProps) {
         milestones={milestones}
         activeMilestoneId={activeMilestoneId}
         onSelectMilestone={setActiveMilestoneId}
-        onMilestoneCreated={reloadMilestones}
+        onMilestonesChanged={reloadMilestones}
       />
 
-      {/* Team/System Filter */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filter by Team/System
-          </label>
-          <div className="flex items-center gap-2 flex-1">
+      {/* Filter bar + Add step on one line (#209) */}
+      <div className="flex flex-wrap items-center justify-between gap-gs-3 border-2 border-gs-rule bg-gs-surface px-gs-3 py-gs-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-gs-3">
+          <label className="flex items-center gap-gs-2 text-sm text-gs-ink">
+            <span className="whitespace-nowrap font-medium">Team / system</span>
             <select
               value={filterEntity || ''}
               onChange={(e) => setFilterEntity(e.target.value || null)}
-              className="input-field flex-1"
-              style={{ maxWidth: '300px' }}
+              className="input-field"
+              style={{ maxWidth: '240px' }}
             >
-              <option value="">All Steps</option>
+              <option value="">All</option>
               {teams.length > 0 && (
                 <optgroup label="Teams">
-                  {teams.map(team => (
+                  {teams.map((team) => (
                     <option key={team.id} value={team.name}>
                       {team.name}
                     </option>
@@ -1186,7 +1190,7 @@ export default function DiscoveryGrid({ projectId }: DiscoveryGridProps) {
               )}
               {systems.length > 0 && (
                 <optgroup label="Systems">
-                  {systems.map(system => (
+                  {systems.map((system) => (
                     <option key={system.id} value={system.name}>
                       {system.name}
                     </option>
@@ -1194,48 +1198,24 @@ export default function DiscoveryGrid({ projectId }: DiscoveryGridProps) {
                 </optgroup>
               )}
             </select>
-            {filterEntity && (
-              <>
-                <button
-                  onClick={() => setFilterEntity(null)}
-                  className="btn-secondary flex items-center gap-1"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear
-                </button>
-                <span className="text-sm text-gray-600 whitespace-nowrap">
-                  Showing {filteredSteps.length} of {steps.length} steps
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--color-deep-navy)' }}>
-            Discovery Grid
-          </h2>
-          <p className="text-sm text-gray-600 mt-1">
+          </label>
+          <span className="text-sm text-gs-ink-muted">
             {filteredSteps.length} step{filteredSteps.length !== 1 ? 's' : ''}
-            {activeMilestoneId && ` in ${milestones.find(m => m.id === activeMilestoneId)?.name || 'milestone'}`}
-            {' • '}Click any cell to edit
-          </p>
+            {activeMilestoneId &&
+              ` in ${milestones.find((m) => m.id === activeMilestoneId)?.name || 'milestone'}`}
+            {filterEntity ? ` · filtered` : ''}
+          </span>
         </div>
-        <div className="flex items-center gap-3">
-          {selectedIds.size > 0 && (
-            <button
-              className="btn-danger"
-              onClick={handleDeleteClick}
-            >
-              <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete ({selectedIds.size})
+        <div className="flex items-center gap-gs-2">
+          {selectedStepCount > 0 ? (
+            <button type="button" className="btn-danger" onClick={handleDeleteClick}>
+              Delete ({selectedStepCount})
+            </button>
+          ) : null}
+          {steps.length > 0 && (
+            <button type="button" className="btn-primary inline-flex items-center gap-gs-2" onClick={handleAddRow}>
+              <Plus size={16} strokeWidth={2} />
+              Add step
             </button>
           )}
         </div>
@@ -1290,28 +1270,21 @@ export default function DiscoveryGrid({ projectId }: DiscoveryGridProps) {
           onRequestCancelNewRow={handleCancelNewRow}
           onRequestCancelWithConfirm={handleRequestCancelWithConfirm}
           onShowValidationWarning={handleShowValidationWarning}
+          onOpenStepDetails={setEditingStep}
         />
       )}
 
-      {/* Add Step Button */}
-      {steps.length > 0 && (
-        <div className="flex justify-center mt-4">
-          <button
-            className="btn-primary"
-            onClick={handleAddRow}
-          >
-            <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Step
-          </button>
-        </div>
-      )}
+      <StepEditModal
+        projectId={projectId}
+        step={editingStep}
+        isOpen={!!editingStep}
+        onClose={() => setEditingStep(null)}
+      />
 
       <ConfirmModal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title={`Delete ${selectedIds.size} Step${selectedIds.size !== 1 ? 's' : ''}?`}
+        title={`Delete ${selectedStepCount} Step${selectedStepCount !== 1 ? 's' : ''}?`}
         description="This action cannot be undone. The selected steps will be permanently deleted."
         confirmAction={{ label: 'Delete', onClick: confirmDelete, style: 'danger' }}
       />

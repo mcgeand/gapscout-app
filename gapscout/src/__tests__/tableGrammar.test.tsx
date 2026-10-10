@@ -2,7 +2,7 @@
  * The column-count invariant and the selection contract for the shared table
  * grammar (#203).
  *
- * EditableRowTable renders four kinds of row against one 12-column header —
+ * EditableRowTable renders four kinds of row against one 9-column header —
  * step, process gap, insert zone, new-row tray — and three of them carried a
  * hand-written colSpan. Two disagreed with the header: the insert zone said 11
  * and the gap row summed to 8. Asserting the two literals would only re-encode
@@ -101,6 +101,7 @@ const baseProps = {
   onRequestCancelNewRow: vi.fn(),
   onRequestCancelWithConfirm: vi.fn(),
   onShowValidationWarning: vi.fn(),
+  onOpenStepDetails: vi.fn(),
 }
 
 /** Cells a row occupies, honouring colSpan. */
@@ -150,7 +151,7 @@ describe('table grammar — column count invariant (#203)', () => {
     expect(table).not.toBeNull()
 
     const headerCells = table!.tHead!.rows[0].cells.length
-    expect(headerCells).toBe(12)
+    expect(headerCells).toBe(9)
 
     const bodyRows = Array.from(table!.tBodies[0].rows)
     // step + gap + new step, each with an insert zone, plus the new-row tray.

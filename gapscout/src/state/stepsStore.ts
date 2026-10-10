@@ -26,6 +26,7 @@ import {
 } from '../services/db'
 import { logger } from '../lib/logger'
 import { milestoneWriteMessage } from '../lib/milestoneWriteMessage'
+import { describeMilestoneUsage, isMilestoneInUse } from '../lib/milestoneUsage'
 import { detectFilledSipocFields } from '../lib/gapAutoStatus'
 import { useGapsStore } from './gapsStore'
 import { createRequestGuard } from './requestGuard'
@@ -603,11 +604,13 @@ export const useStepsStore = create<StepsStore>((set, get) => ({
 
       // Authoritative usage count from the DB (replaces a prior in-memory
       // filter that depended on `get().steps` being loaded and current).
-      const usageCount = await getMilestoneUsageCount(milestoneId, projectId)
+      // Process gaps count too: their milestone FK is ON DELETE SET NULL, so a
+      // delete would strand them rather than fail.
+      const usage = await getMilestoneUsageCount(milestoneId, projectId)
       if (!loadGuard.isCurrent(operationId, projectId, 'mutation') || !isProjectScopeCurrent(scope)) return
-      if (usageCount > 0) {
+      if (isMilestoneInUse(usage)) {
         toast.error(
-          `Cannot delete milestone "${milestone?.name || 'Unknown'}" — used by ${usageCount} step${usageCount === 1 ? '' : 's'}`
+          `Cannot delete milestone "${milestone?.name || 'Unknown'}" — used by ${describeMilestoneUsage(usage)}`
         )
         return
       }

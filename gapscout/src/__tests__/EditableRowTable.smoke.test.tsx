@@ -116,6 +116,7 @@ const noopProps = {
   onRequestCancelNewRow: vi.fn(),
   onRequestCancelWithConfirm: vi.fn(),
   onShowValidationWarning: vi.fn(),
+  onOpenStepDetails: vi.fn(),
 }
 
 
@@ -202,6 +203,7 @@ describe('EditableRowTable — smoke', () => {
         onRequestCancelNewRow={vi.fn()}
         onRequestCancelWithConfirm={vi.fn()}
         onShowValidationWarning={vi.fn()}
+        onOpenStepDetails={vi.fn()}
       />
     )
     expect(container).toBeInTheDocument()
@@ -282,11 +284,11 @@ describe('EditableRowTable — new-row Save Step (#171)', () => {
     )
   }
 
-  // Column order: checkbox, validation, #, Milestone, Supplier, Inputs,
-  // Process, Output, Customer, Trigger, Notes, SIPOC.
+  // Column order: checkbox, SIPOC, #, Milestone, Supplier, Inputs,
+  // Process, Output, Customer (#209).
   const openOutputsEditor = () => {
     const row = screen.getByText('Repro Step').closest('tr') as HTMLElement
-    fireEvent.click(within(within(row).getAllByRole('cell')[7]).getByText('—'))
+    fireEvent.click(within(within(row).getAllByRole('cell')[7]).getByText(/— add output/))
     return screen.getByPlaceholderText('Report, Result...')
   }
 
@@ -456,13 +458,13 @@ describe('EditableRowTable — gap auto-sync after auto-status (#88)', () => {
   async function runPromotingEdit() {
     const { container } = render(<EditableRowTable {...props} />)
 
-    // Column 5 is Inputs (drag/checkbox, validation, order, milestone, supplier,
-    // inputs); the placeholder confirms the editor that opened is the right one.
+    // Column 5 is Inputs (checkbox, SIPOC, #, milestone, supplier, inputs);
+    // the placeholder confirms the editor that opened is the right one.
     const stepRow = Array.from(container.querySelectorAll('tbody tr')).find(row =>
       row.textContent?.includes(midStep.label)
     )
     const inputsCell = stepRow!.querySelectorAll('td')[5] as HTMLElement
-    fireEvent.click(within(inputsCell).getByText('—'))
+    fireEvent.click(within(inputsCell).getByText(/— add inputs/))
     const editor = screen.getByPlaceholderText('Request, Data...')
     fireEvent.change(editor, { target: { value: 'Purchase request' } })
     fireEvent.blur(editor)

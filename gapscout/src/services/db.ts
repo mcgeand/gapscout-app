@@ -2438,31 +2438,45 @@ export async function deleteMilestone(id: string, projectId: string): Promise<vo
   await touchProject(db, projectId, Date.now());
 }
 
+/** What still references a milestone; see `getMilestoneUsageCount`. */
+export interface MilestoneUsage {
+  steps: number;
+  processGaps: number;
+}
+
 /**
- * Get usage count for a milestone (how many steps in a project reference it).
+ * Get usage for a milestone: the steps that reference it (FK RESTRICT) and
+ * the process gaps placed in it (`gaps.order_num IS NOT NULL`, FK SET NULL —
+ * a delete would silently strand them, so the guard must count them too).
+ * Gaps without `order_num` ride on their step and are not counted twice.
  *
- * Single SQL round-trip against the FK column `steps.milestone_id`. Replaces
- * the in-memory `.filter(...).length` check that was previously in
- * `stepsStore.deleteMilestone`, which depended on `get().steps` being loaded
- * and current.
+ * Single SQL round-trip. Replaces the in-memory `.filter(...).length` check
+ * that was previously in `stepsStore.deleteMilestone`, which depended on
+ * `get().steps` being loaded and current.
  */
 export async function getMilestoneUsageCount(
   milestoneId: string,
   projectId: string
-): Promise<number> {
+): Promise<MilestoneUsage> {
   const db = getDB();
 
-  const rows = await db.select<{ count: number }[]>(
-    `SELECT COUNT(*) AS count FROM steps
-     WHERE project_id = $1 AND milestone_id = $2`,
-    [projectId, milestoneId]
+  const rows = await db.select<{ steps: number; process_gaps: number }[]>(
+    `SELECT
+       (SELECT COUNT(*) FROM steps
+         WHERE project_id = $1 AND milestone_id = $2) AS steps,
+       (SELECT COUNT(*) FROM gaps
+         WHERE project_id = $3 AND milestone_id = $4
+           AND order_num IS NOT NULL) AS process_gaps`,
+    // Each placeholder appears once: the sql.js adapter rewrites `` to a bare
+    // `?` and binds positionally, so a repeated `` would bind nothing.
+    [projectId, milestoneId, projectId, milestoneId]
   );
 
-  const count = rows[0]?.count;
-  if (count === undefined) {
+  const row = rows[0];
+  if (row === undefined || row.steps === undefined || row.process_gaps === undefined) {
     throw new Error("getMilestoneUsageCount: COUNT(*) returned no row");
   }
-  return count;
+  return { steps: row.steps, processGaps: row.process_gaps };
 }
 
 // ============================================================================

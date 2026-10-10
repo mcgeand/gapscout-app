@@ -1,17 +1,14 @@
 /**
- * Milestones Tabs - Horizontal tabs for filtering steps by milestone
- * 
- * Features:
- * - Tab for each milestone
- * - "All" tab to show all steps
- * - Click tab to filter Discovery Grid
- * - "+" button to add new milestone
- * - Active tab highlighting
- * 
- * References: PRD Section 4.4 - Discovery Grid (Milestones Section)
+ * Milestone filter as an ink segmented control (#209).
+ *
+ * One 2px rule box: All steps · each milestone · +. Active segment is ink /
+ * on-ink (not accent — that job is primary action / high severity). The strip
+ * filters and opens the add modal; the active milestone's own row below it
+ * carries Edit and Delete (#106).
  */
 
 import { useState } from 'react'
+import { Plus, SquarePen, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { Milestone } from '../../data/types'
 import { milestoneWriteMessage } from '../../lib/milestoneWriteMessage'
@@ -22,6 +19,10 @@ interface MilestonesTabsProps {
   activeMilestoneId: string | null // null = "All"
   onSelectMilestone: (milestoneId: string | null) => void
   onAddMilestone: () => void
+  /** Opens the edit dialog for the active milestone. Omit to hide the control. */
+  onEditMilestone?: (milestone: Milestone) => void
+  /** Starts the delete flow for the active milestone. Omit to hide the control. */
+  onDeleteMilestone?: (milestone: Milestone) => void
 }
 
 export default function MilestonesTabs({
@@ -29,111 +30,99 @@ export default function MilestonesTabs({
   activeMilestoneId,
   onSelectMilestone,
   onAddMilestone,
+  onEditMilestone,
+  onDeleteMilestone,
 }: MilestonesTabsProps) {
-  const [isHoveringAdd, setIsHoveringAdd] = useState(false)
-
-  // Sort milestones by order
   const sortedMilestones = [...milestones].sort((a, b) => a.order - b.order)
+  const active =
+    activeMilestoneId !== null
+      ? milestones.find((m) => m.id === activeMilestoneId)
+      : undefined
 
   return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="px-6 py-3">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {/* "All" Tab */}
-          <button
-            onClick={() => onSelectMilestone(null)}
-            className={`btn-ghost whitespace-nowrap ${
-              activeMilestoneId === null
-                ? 'bg-gs-accent text-gs-on-accent'
-                : 'hover:bg-gs-sunken'
-            }`}
-          >
-            All Steps
-          </button>
+    <div className="flex flex-col gap-gs-2">
+      <div className="seg seg-ink overflow-x-auto">
+        <div className="inline-flex" role="radiogroup" aria-label="Milestone filter">
+          <label className="seg-option">
+            <input
+              type="radio"
+              className="sr-only"
+              name="milestone-filter"
+              checked={activeMilestoneId === null}
+              onChange={() => onSelectMilestone(null)}
+            />
+            <span className="seg-face whitespace-nowrap">All steps</span>
+          </label>
 
-          {/* Milestone Tabs */}
           {sortedMilestones.map((milestone) => (
-            <button
-              key={milestone.id}
-              onClick={() => onSelectMilestone(milestone.id)}
-              className={`btn-ghost whitespace-nowrap ${
-                activeMilestoneId === milestone.id
-                  ? 'bg-gs-accent text-gs-on-accent'
-                  : 'hover:bg-gs-sunken'
-              }`}
-              title={milestone.description || undefined}
-            >
-              {milestone.name}
-            </button>
-          ))}
-
-          {/* Add Milestone Button */}
-          <button
-            onClick={onAddMilestone}
-            onMouseEnter={() => setIsHoveringAdd(true)}
-            onMouseLeave={() => setIsHoveringAdd(false)}
-            className="px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 text-gray-500 hover:text-gray-700 font-medium text-sm transition-colors whitespace-nowrap flex items-center gap-2"
-            title="Add new milestone"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
+            <label key={milestone.id} className="seg-option" title={milestone.description || undefined}>
+              <input
+                type="radio"
+                className="sr-only"
+                name="milestone-filter"
+                checked={activeMilestoneId === milestone.id}
+                onChange={() => onSelectMilestone(milestone.id)}
               />
-            </svg>
-            {isHoveringAdd && <span>New Milestone</span>}
-          </button>
+              <span className="seg-face whitespace-nowrap">{milestone.name}</span>
+            </label>
+          ))}
         </div>
+
+        <button
+          type="button"
+          className="seg-add"
+          onClick={onAddMilestone}
+          title="Add new milestone"
+          aria-label="Add new milestone"
+        >
+          <Plus size={16} strokeWidth={2} />
+        </button>
       </div>
 
-      {/* Active Milestone Info */}
-      {activeMilestoneId !== null && (
-        <div className="px-6 pb-3">
-          {(() => {
-            const active = milestones.find((m) => m.id === activeMilestoneId)
-            if (!active) return null
-
-            return (
-              <div className="flex items-start gap-3 text-sm">
-                <div className="flex-1">
-                  {active.description && (
-                    <p className="text-gray-600">{active.description}</p>
-                  )}
-                  {active.relatedPolicies.length > 0 && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-gray-500">Policies:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {active.relatedPolicies.map((policy, idx) => (
-                          <span key={idx} className="badge-blue text-xs">
-                            {policy}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => {
-                    // TODO: Implement edit milestone
-                    toast('Edit milestone coming soon!')
-                  }}
-                  className="text-gray-400 hover:text-gray-600 p-1"
-                  title="Edit milestone"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
-                </button>
+      {active && (
+        <div className="flex flex-wrap items-start justify-between gap-gs-3">
+          <div className="min-w-0 flex-1 text-sm text-gs-ink-muted">
+            {active.description && <p>{active.description}</p>}
+            {active.relatedPolicies.length > 0 && (
+              <div className="mt-gs-1 flex flex-wrap items-center gap-gs-2">
+                <span>Policies:</span>
+                {active.relatedPolicies.map((policy) => (
+                  <span key={policy} className="badge-gray text-xs">
+                    {policy}
+                  </span>
+                ))}
               </div>
-            )
-          })()}
+            )}
+          </div>
+
+          {(onEditMilestone || onDeleteMilestone) && (
+            <div className="flex shrink-0 items-center gap-gs-2">
+              {onEditMilestone && (
+                <button
+                  type="button"
+                  className="btn-ghost inline-flex items-center gap-gs-2 px-gs-2 py-gs-1"
+                  onClick={() => onEditMilestone(active)}
+                  title={`Edit milestone "${active.name}"`}
+                  aria-label={`Edit milestone ${active.name}`}
+                >
+                  <SquarePen size={16} strokeWidth={2} />
+                  <span>Edit</span>
+                </button>
+              )}
+              {onDeleteMilestone && (
+                <button
+                  type="button"
+                  className="btn-ghost inline-flex items-center gap-gs-2 px-gs-2 py-gs-1"
+                  onClick={() => onDeleteMilestone(active)}
+                  title={`Delete milestone "${active.name}"`}
+                  aria-label={`Delete milestone ${active.name}`}
+                >
+                  <Trash2 size={16} strokeWidth={2} />
+                  <span>Delete</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -169,8 +158,7 @@ export function AddMilestoneModal({
     try {
       setIsSaving(true)
       await onSave(name.trim(), description.trim() || undefined)
-      
-      // Reset form
+
       setName('')
       setDescription('')
       onClose()
@@ -211,54 +199,154 @@ export function AddMilestoneModal({
       }
     >
       <div className="flex flex-col gap-gs-4">
-            <div>
-              <label className="label-field">Milestone Name *</label>
-              <input
-                type="text"
-                className="input-field w-full"
-                placeholder="e.g., Discovery, Planning, Execution"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && name.trim()) {
-                    handleSave()
-                  }
-                }}
-                autoFocus
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Current order: {existingMilestones.length + 1}
-              </p>
-            </div>
+        <div>
+          <label className="label-field">Milestone Name *</label>
+          <input
+            type="text"
+            className="input-field w-full"
+            placeholder="e.g., Discovery, Planning, Execution"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && name.trim()) {
+                handleSave()
+              }
+            }}
+            autoFocus
+          />
+          <p className="mt-gs-1 text-xs text-gs-ink-muted">
+            Current order: {existingMilestones.length + 1}
+          </p>
+        </div>
 
-            <div>
-              <label className="label-field">Description (Optional)</label>
-              <textarea
-                className="textarea-field w-full"
-                rows={3}
-                placeholder="Brief description of this phase..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+        <div>
+          <label className="label-field">Description (Optional)</label>
+          <textarea
+            className="textarea-field w-full"
+            rows={3}
+            placeholder="Brief description of this phase..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
 
-            {/* Preview existing milestones */}
-            {existingMilestones.length > 0 && (
-              <div>
-                <label className="label-field">Existing Milestones</label>
-                <div className="flex flex-wrap gap-2">
-                  {existingMilestones
-                    .sort((a, b) => a.order - b.order)
-                    .map((m) => (
-                      <span key={m.id} className="badge-gray text-xs">
-                        {m.order + 1}. {m.name}
-                      </span>
-                    ))}
-                </div>
-              </div>
-            )}
+        {existingMilestones.length > 0 && (
+          <div>
+            <label className="label-field">Existing Milestones</label>
+            <div className="flex flex-wrap gap-gs-2">
+              {existingMilestones
+                .sort((a, b) => a.order - b.order)
+                .map((m) => (
+                  <span key={m.id} className="badge-gray text-xs">
+                    {m.order + 1}. {m.name}
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   )
 }
 
+/**
+ * Edit Milestone Modal (#106) - name and description only.
+ *
+ * Order is deliberately not editable here: milestone order is UNIQUE per
+ * project (#131) and a move is a swap, which only `reorderMilestones` can
+ * express. Related policies are left exactly as stored; nothing in this
+ * dialog sends them, so an edit cannot drop them.
+ *
+ * Mounted with a `key` of the milestone id by the caller, so the fields seed
+ * from the milestone once per opening rather than through an effect.
+ */
+interface EditMilestoneModalProps {
+  isOpen: boolean
+  onClose: () => void
+  milestone: Milestone
+  onSave: (name: string, description: string) => Promise<void>
+}
+
+export function EditMilestoneModal({
+  isOpen,
+  onClose,
+  milestone,
+  onSave,
+}: EditMilestoneModalProps) {
+  const [name, setName] = useState(milestone.name)
+  const [description, setDescription] = useState(milestone.description ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+
+  const canSave = name.trim().length > 0 && !isSaving
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error('Milestone name is required')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      await onSave(name.trim(), description.trim())
+      onClose()
+    } catch (error) {
+      console.error('Failed to update milestone:', error)
+      toast.error(milestoneWriteMessage(error, 'Failed to update milestone'))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={isSaving ? () => {} : onClose}
+      title="Edit Milestone"
+      size="sm"
+      footer={
+        <>
+          <button className="btn-secondary" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={handleSave} disabled={!canSave}>
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-gs-4">
+        <div>
+          <label className="label-field" htmlFor="edit-milestone-name">
+            Milestone Name *
+          </label>
+          <input
+            id="edit-milestone-name"
+            type="text"
+            className="input-field w-full"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && canSave) {
+                handleSave()
+              }
+            }}
+            autoFocus
+          />
+        </div>
+
+        <div>
+          <label className="label-field" htmlFor="edit-milestone-description">
+            Description (Optional)
+          </label>
+          <textarea
+            id="edit-milestone-description"
+            className="textarea-field w-full"
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+      </div>
+    </Modal>
+  )
+}

@@ -146,6 +146,7 @@ const props = {
   onRequestCancelNewRow: vi.fn(),
   onRequestCancelWithConfirm: vi.fn(),
   onShowValidationWarning: vi.fn(),
+  onOpenStepDetails: vi.fn(),
 }
 
 describe('EditableRowTable — a gap-closing row stays in its milestone (#332)', () => {

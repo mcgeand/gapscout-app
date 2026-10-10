@@ -126,32 +126,11 @@ describe('StepRow — SIPOC badge', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('keeps the chain column reading the same list as the badge under a filter', () => {
-    // validateStepChain walks by array position. Handed only the visible rows,
-    // it would read the wrong neighbour and contradict the badge — two
-    // indicators in one row disagreeing is worse than both being wrong.
-    const visible = makeStep({ id: 'step-1', order: 1, outputs: ['Request'], customers: ['Procurement'] })
-    const hiddenNeighbour = makeStep({
-      id: 'step-2',
-      order: 2,
-      label: 'Raise PO',
-      suppliers: ['Procurement'],
-      inputs: ['Request'],
-    })
-
-    renderRow(visible, [visible], [visible, hiddenNeighbour])
-
-    expect(screen.getByTitle('All SIPOC fields complete')).toBeInTheDocument()
-    // Sees the hidden neighbour take delivery. Handed only the visible row it
-    // would read "First and only step" and skip the chain rules entirely.
-    expect(screen.getByTitle('Entry point ready')).toBeInTheDocument()
-    expect(screen.queryByTitle('First and only step')).not.toBeInTheDocument()
-  })
-
   it('validates against every step, not just the rows a filter left visible', () => {
-    // Chain rules read the next step. With only the visible row in hand, a
-    // filtered step looks like the last one in its milestone and every
-    // output/customer rule is skipped.
+    // Chain rules read the next step via validationSteps. With only the visible
+    // row in hand, a filtered step looks like the last one in its milestone and
+    // every output/customer rule is skipped. The SIPOC column is the only
+    // validation surface after #209.
     const visible = makeStep({ id: 'step-1', order: 1, outputs: ['Request'], customers: ['Procurement'] })
     const hidden = makeStep({
       id: 'step-2',
@@ -165,5 +144,22 @@ describe('StepRow — SIPOC badge', () => {
 
     expect(screen.queryByTitle('All SIPOC fields complete')).not.toBeInTheDocument()
     expect(screen.getByText('Customer(s) not matched in next step: Procurement')).toBeInTheDocument()
+  })
+
+  it('sees a matching hidden neighbour through validationSteps', () => {
+    // Handed only the visible row, validateStep would treat it as last and skip
+    // the customer/output chain rules — green for the wrong reason.
+    const visible = makeStep({ id: 'step-1', order: 1, outputs: ['Request'], customers: ['Procurement'] })
+    const hiddenNeighbour = makeStep({
+      id: 'step-2',
+      order: 2,
+      label: 'Raise PO',
+      suppliers: ['Procurement'],
+      inputs: ['Request'],
+    })
+
+    renderRow(visible, [visible], [visible, hiddenNeighbour])
+
+    expect(screen.getByTitle('All SIPOC fields complete')).toBeInTheDocument()
   })
 })

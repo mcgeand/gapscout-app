@@ -534,12 +534,12 @@ describe('StepRow — an editor left open across a landed write', () => {
       expect(onUpdate).toHaveBeenCalledTimes(1)
 
       // A second editor is open and typed into while the first write hangs.
-      // Column 10 is Notes: checkbox, validation, #, milestone, supplier,
-      // inputs, process, output, customer, trigger, notes, SIPOC.
-      const notesCell = view.container.querySelectorAll('td')[10] as HTMLElement
-      fireEvent.click(within(notesCell).getByText('—'))
-      const notes = screen.getByPlaceholderText('Additional notes...')
-      fireEvent.change(notes, { target: { value: 'Queued behind the write' } })
+      // Column 7 is Output: checkbox, SIPOC, #, milestone, supplier, inputs,
+      // process, output, customer (#209).
+      const outputsCell = view.container.querySelectorAll('td')[7] as HTMLElement
+      fireEvent.click(within(outputsCell).getByText(/— add output/))
+      const outputs = screen.getByPlaceholderText('Report, Result...')
+      fireEvent.change(outputs, { target: { value: 'Queued behind the write' } })
       view.unmount()
 
       await act(async () => {
@@ -549,7 +549,7 @@ describe('StepRow — an editor left open across a landed write', () => {
 
       expect(onUpdate).toHaveBeenCalledTimes(2)
       expect(onUpdate).toHaveBeenLastCalledWith(
-        { notes: 'Queued behind the write' },
+        { outputs: ['Queued behind the write'] },
         { unattended: true }
       )
     } finally {

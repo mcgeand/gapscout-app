@@ -77,7 +77,7 @@ describe('stepsStore.deleteMilestone', () => {
   })
 
   it('blocks deletion and toasts a friendly error when steps still use the milestone', async () => {
-    mockGetMilestoneUsageCount.mockResolvedValueOnce(2)
+    mockGetMilestoneUsageCount.mockResolvedValueOnce({ steps: 2, processGaps: 0 })
 
     await useStepsStore.getState().deleteMilestone('ms-1')
 
@@ -89,7 +89,7 @@ describe('stepsStore.deleteMilestone', () => {
   })
 
   it('uses singular "step" when exactly one step references the milestone', async () => {
-    mockGetMilestoneUsageCount.mockResolvedValueOnce(1)
+    mockGetMilestoneUsageCount.mockResolvedValueOnce({ steps: 1, processGaps: 0 })
 
     await useStepsStore.getState().deleteMilestone('ms-1')
 
@@ -97,8 +97,41 @@ describe('stepsStore.deleteMilestone', () => {
     expect(mockToastError.mock.calls[0][0]).toMatch(/used by 1 step$/)
   })
 
+  it('blocks deletion when only process gaps use the milestone (gap-only refusal)', async () => {
+    // FK is ON DELETE SET NULL for gaps, so without this guard the delete would
+    // succeed and strand them.
+    mockGetMilestoneUsageCount.mockResolvedValueOnce({ steps: 0, processGaps: 2 })
+
+    await useStepsStore.getState().deleteMilestone('ms-1')
+
+    expect(mockDbDeleteMilestone).not.toHaveBeenCalled()
+    expect(mockToastSuccess).not.toHaveBeenCalled()
+    expect(mockToastError).toHaveBeenCalledTimes(1)
+    expect(mockToastError.mock.calls[0][0]).toMatch(
+      /Cannot delete milestone "Approval" — used by 2 process gaps$/
+    )
+    expect(useStepsStore.getState().milestones).toEqual([seedMilestone])
+  })
+
+  it('uses the singular "process gap" for exactly one', async () => {
+    mockGetMilestoneUsageCount.mockResolvedValueOnce({ steps: 0, processGaps: 1 })
+
+    await useStepsStore.getState().deleteMilestone('ms-1')
+
+    expect(mockDbDeleteMilestone).not.toHaveBeenCalled()
+    expect(mockToastError.mock.calls[0][0]).toMatch(/used by 1 process gap$/)
+  })
+
+  it('names both counts when steps and process gaps both use the milestone', async () => {
+    mockGetMilestoneUsageCount.mockResolvedValueOnce({ steps: 2, processGaps: 1 })
+
+    await useStepsStore.getState().deleteMilestone('ms-1')
+
+    expect(mockDbDeleteMilestone).not.toHaveBeenCalled()
+    expect(mockToastError.mock.calls[0][0]).toMatch(/used by 2 steps and 1 process gap$/)
+  })
   it('proceeds with deletion and toasts success when usage is 0', async () => {
-    mockGetMilestoneUsageCount.mockResolvedValueOnce(0)
+    mockGetMilestoneUsageCount.mockResolvedValueOnce({ steps: 0, processGaps: 0 })
 
     await useStepsStore.getState().deleteMilestone('ms-1')
 
@@ -128,7 +161,7 @@ describe('stepsStore.deleteMilestone', () => {
   })
 
   it('falls back to a domain error if a constraint failure still escapes the pre-check', async () => {
-    mockGetMilestoneUsageCount.mockResolvedValueOnce(0)
+    mockGetMilestoneUsageCount.mockResolvedValueOnce({ steps: 0, processGaps: 0 })
     mockDbDeleteMilestone.mockRejectedValueOnce(new Error('FOREIGN KEY constraint failed'))
 
     await useStepsStore.getState().deleteMilestone('ms-1')

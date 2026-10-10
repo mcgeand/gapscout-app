@@ -354,3 +354,75 @@ describe("GapForm names the position the grid is showing (#333)", () => {
     expect(screen.getByText("Place before (position 1)")).toBeInTheDocument();
   });
 });
+
+// #229: the gap-vs-gap conflict offers "Update existing gap", which switches the
+// form into edit mode on the gap already holding that order. The new-gap draft
+// is discarded; Observed/Expected are not carried across.
+describe("GapForm gap-vs-gap order conflict can update the existing gap (#229)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearProjectScope();
+    beginProjectScope("project-1");
+    mockedCreateGap.mockResolvedValue("gap-new");
+    mockedListSteps.mockResolvedValue(steps as never);
+    useStepsStore.setState({ steps, currentProjectId: "project-1", isLoading: false });
+    useTeamsStore.setState({ teams: [], currentProjectId: null, isLoading: false });
+    useGapsStore.setState({
+      gaps: [
+        {
+          id: "gap-existing",
+          projectId: "project-1",
+          observed: "Existing process gap",
+          expected: "Fixed",
+          severity: "M",
+          status: "Open",
+          order: 1,
+          milestoneId: "milestone-3",
+          links: [],
+          createdAt: 1,
+          updatedAt: 1,
+        } as Gap,
+      ],
+      currentProjectId: "project-1",
+      isLoading: false,
+    });
+  });
+
+  it("offers update-existing, place-before and place-after", async () => {
+    renderProcessGapForm("milestone-3", 1);
+
+    await waitFor(() =>
+      expect(screen.getByText("Order Conflict Detected")).toBeInTheDocument()
+    );
+    expect(screen.getByText("Gap 1: Existing process gap")).toBeInTheDocument();
+    expect(screen.getByText("Update existing gap")).toBeInTheDocument();
+    expect(screen.getByText("Place before (position 1)")).toBeInTheDocument();
+    expect(screen.getByText("Place after (position 2)")).toBeInTheDocument();
+  });
+
+  it("opens the existing gap in edit mode, pre-filled, without carrying the new draft", async () => {
+    renderProcessGapForm("milestone-3", 1);
+
+    await waitFor(() =>
+      expect(screen.getByText("Order Conflict Detected")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByText("Update existing gap"));
+
+    // Same modal, now editing: the conflict closed and the form remounted on
+    // the existing gap's data rather than the draft typed a moment ago.
+    await waitFor(() => expect(screen.getByText("Edit gap")).toBeInTheDocument());
+    expect(screen.queryByText("Order Conflict Detected")).toBeNull();
+    expect(
+      screen.getByPlaceholderText("What do we currently see? What is the problem?")
+    ).toHaveValue("Existing process gap");
+    expect(
+      screen.getByPlaceholderText("What should we see? What is the ideal outcome?")
+    ).toHaveValue("Fixed");
+    expect(screen.queryByDisplayValue("Missing a step here")).toBeNull();
+    expect(screen.getByRole("button", { name: /Delete Gap/ })).toBeInTheDocument();
+
+    expect(mockedCreateGap).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalledWith(expect.stringMatching(/coming soon/i));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+});
