@@ -6,6 +6,20 @@ GapScout is a desktop app for SIPOC process mapping and gap analysis. You descri
 
 GapScout is in **beta**. Expect rough edges, and please tell us about them.
 
+## Screenshots
+
+Discovery — steps in order, with SIPOC columns:
+
+![Discovery grid](screenshots/discovery.png)
+
+Diagram — the same steps laid out by team:
+
+![Process diagram](screenshots/diagram.png)
+
+Gaps — what is broken, against which step:
+
+![Gap analysis](screenshots/gaps.png)
+
 ## Download
 
 Get the latest build from [Releases](https://github.com/mcgeand/gapscout-app/releases/latest).
